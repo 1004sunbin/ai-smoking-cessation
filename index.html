@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>每一根</title>
+<meta name="description" content="戒烟陪伴：烟瘾急救 + 复吸后继续陪伴。每一根都记下来，但一次复吸不让你从零开始。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app" id="appView">
+  <header class="top">
+    <div>
+      <div class="brand">每一根 · 戒烟陪伴</div>
+      <div class="date" id="todayLabel"></div>
+    </div>
+    <button class="iconbtn" id="openSettings" aria-label="设置与隐私">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <div class="demo-bar" id="demoBar" hidden>
+    <span><b>演示模式</b> · 以下是模拟用户「小林」的数据</span>
+    <span class="demo-acts"><button id="demoReset">重置演示</button><button id="demoExit">用我自己的数据</button></span>
+  </div>
+
+  <!-- ============ 今天 ============ -->
+  <section class="tab active" id="tab-today">
+    <h1 class="large" id="greet">今天</h1>
+    <p class="lead" id="greetSub">每一根都记下来，但一次复吸不让你从零开始。</p>
+
+    <div class="card hero">
+      <div class="label">这一段无烟时长</div>
+      <div class="clock" id="clock">0<small>天</small> 00:00:00</div>
+      <div class="hint" id="heroSub"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="stat"><div class="k"><span class="dot" style="background:var(--green)"></span>少抽的烟 · 估算</div><div class="v" id="sAvoided">0<small>根</small></div></div>
+      <div class="stat"><div class="k"><span class="dot" style="background:var(--orange)"></span>省下的钱 · 估算</div><div class="v" id="sMoney">¥0</div></div>
+      <div class="stat"><div class="k"><span class="dot" style="background:var(--blue)"></span>预期寿命 · 统计估算</div><div class="v" id="sLife">0<small>分钟</small></div></div>
+      <div class="stat"><div class="k"><span class="dot" style="background:var(--purple)"></span>少吸入焦油 · 估算</div><div class="v" id="sTar">0<small>mg</small></div></div>
+    </div>
+    <p class="foot" style="margin:-6px 4px 14px" id="estNote"></p>
+
+    <div class="card">
+      <h3>此刻，你选择了什么？</h3>
+      <p class="hint">一键记录。记错了可以撤销，忘了可以补记。</p>
+      <div class="row" style="margin-top:14px">
+        <button class="btn green" id="btnResist">✋ 忍住了</button>
+        <button class="btn ghost" id="btnSmoke">抽了一根</button>
+      </div>
+      <div class="daybar" id="dayBar"></div>
+      <div class="log" id="todayLog"></div>
+      <button class="link" id="btnBackfill">＋ 补记更早的记录</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>今天的预案</h3><span class="hint" id="planSource"></span></div>
+      <div id="planBody"></div>
+    </div>
+
+    <div class="card" id="checkinCard">
+      <h3>每日打卡</h3>
+      <p class="hint" id="checkinHint">花 10 秒记录今天的状态</p>
+      <div style="margin-top:12px" id="checkinBody"></div>
+    </div>
+  </section>
+
+  <!-- ============ 一根烟 ============ -->
+  <section class="tab" id="tab-cig">
+    <h1 class="large">一根烟</h1>
+    <p class="lead">长按点燃，看看这一根在你身体里发生了什么。</p>
+
+    <div class="card">
+      <div class="brand-search">
+        <input id="brandQ" type="search" placeholder="搜索你抽的烟，如：黄鹤楼" autocomplete="off" enterkeyhint="search">
+        <div class="brand-results" id="brandResults" hidden></div>
+      </div>
+      <div class="seg" id="brandSeg"></div>
+      <div class="cig-stage" id="cigStage">
+        <svg viewBox="0 0 340 46" aria-label="香烟">
+          <defs>
+            <radialGradient id="ember" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd27a"/><stop offset=".45" stop-color="#ff6a00"/><stop offset="1" stop-color="#ff3b30" stop-opacity="0"/></radialGradient>
+            <pattern id="cork" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="var(--filter)"/><circle cx="2" cy="2" r=".9" fill="#a8692c" opacity=".55"/><circle cx="5" cy="4.5" r=".7" fill="#a8692c" opacity=".4"/></pattern>
+          </defs>
+          <rect x="10" y="10" width="76" height="26" rx="4" fill="url(#cork)"/>
+          <rect x="84" y="10" width="2" height="26" fill="#c9a24a" opacity=".8"/>
+          <rect id="paper" x="86" y="10" width="240" height="26" fill="var(--paper)" stroke="var(--line)"/>
+          <rect id="ash" x="326" y="11" width="0" height="24" rx="3" fill="var(--ash)"/>
+          <circle id="emberDot" cx="326" cy="23" r="0" fill="url(#ember)"/>
+          <text x="48" y="27" text-anchor="middle" font-size="9" font-weight="700" fill="#7a4a1c" opacity=".7" id="brandMark">MARLBORO</text>
+        </svg>
+      </div>
+      <button class="holdbtn" id="holdBtn"><i class="fill" id="holdFill"></i><span id="holdText">按住 点燃这一根</span></button>
+
+      <div class="meters">
+        <div class="meter"><div class="k">焦油</div><div class="v" id="mTar">0<small>mg</small></div></div>
+        <div class="meter"><div class="k">尼古丁</div><div class="v" id="mNic">0<small>mg</small></div></div>
+        <div class="meter"><div class="k">一氧化碳</div><div class="v" id="mCo">0<small>mg</small></div></div>
+        <div class="meter"><div class="k">寿命</div><div class="v" id="mLife" style="color:var(--red)">-0<small>分钟</small></div></div>
+        <div class="meter"><div class="k">化学物质</div><div class="v" id="mChem">0<small>种</small></div></div>
+        <div class="meter"><div class="k">花费</div><div class="v" id="mCost">¥0</div></div>
+      </div>
+
+      <div class="lab-body" id="labBody">
+        <svg class="body-svg" id="bodySvg" viewBox="0 0 120 220" aria-label="人体示意">
+          <circle class="outline" cx="60" cy="30" r="24"/>
+          <path class="outline" d="M48 52 v10 M72 52 v10 M22 70 q38 -14 76 0 l-4 92 q-34 10 -68 0 z"/>
+          <ellipse class="organ" data-o="brain" cx="60" cy="26" rx="15" ry="11"/>
+          <path class="organ" data-o="throat" d="M55 50 h10 v22 h-10 z"/>
+          <ellipse class="organ" data-o="lungs" cx="44" cy="102" rx="13" ry="24"/>
+          <ellipse class="organ" data-o="lungs" cx="76" cy="102" rx="13" ry="24"/>
+          <path class="organ" data-o="heart" d="M62 118 c0 -6 8 -9 11 -3 c3 -6 11 -3 11 3 c0 7 -11 13 -11 13 s-11 -6 -11 -13z"/>
+          <path class="organ" data-o="blood" d="M30 140 q30 14 60 0 l-1 8 q-29 13 -58 0z"/>
+        </svg>
+        <ul class="events" id="events"></ul>
+      </div>
+
+      <div class="result" id="result">
+        <h4>如果，你放下这一根 🌱</h4>
+        <p class="hint" style="margin:0">同样一根烟的时间，你的身体可以换来：</p>
+        <div class="gainlist" id="gainList"></div>
+        <div class="row">
+          <button class="btn green small" id="putDown">我放下了这一根</button>
+          <button class="btn ghost small" id="relight">重新演示</button>
+        </div>
+      </div>
+      <p class="foot" id="brandFoot"></p>
+    </div>
+
+    <div class="eyebrow">少抽一根计算器</div>
+    <div class="card">
+      <h3>每天少抽 <span id="lessN" style="color:var(--blue)">1</span> 根，一年后</h3>
+      <input type="range" min="1" max="20" value="1" id="lessRange" aria-label="每天少抽几根">
+      <div class="calc-out">
+        <div><b id="cLife">2.8 天</b><span>夺回的寿命</span></div>
+        <div><b id="cMoney">¥456</b><span>省下的钱</span></div>
+        <div><b id="cTar">3.7 g</b><span>没进肺的焦油</span></div>
+        <div><b id="cCount">365 根</b><span>没点燃的烟</span></div>
+      </div>
+    </div>
+    <p class="foot">数据来源与说明：每根烟约减少 11 分钟预期寿命为群体统计估算（Shaw 等，BMJ 2000）；烟草烟雾含 7000+ 种化学物质、至少 70 种致癌物（美国 CDC / NCI）；尼古丁约 10 秒抵达大脑（NIDA）。包装上的焦油、尼古丁、一氧化碳为机器测量值，实际吸入量因抽吸方式常更高。以上用于健康科普，不构成医疗诊断。</p>
+  </section>
+
+  <!-- ============ 恢复 ============ -->
+  <section class="tab" id="tab-heal">
+    <h1 class="large">身体恢复</h1>
+    <p class="lead" id="healLead">从最后一根烟开始计时，身体每一刻都在变好。</p>
+    <div class="card" id="timeline"></div>
+    <div class="eyebrow">里程碑</div>
+    <div class="card"><div class="badges" id="badges"></div></div>
+    <p class="foot">恢复时间线参考 WHO 与美国 CDC 公开资料，是人群层面的平均趋势，个体差异很大，不代表你个人的医学结果。</p>
+  </section>
+
+  <!-- ============ 陪伴 ============ -->
+  <section class="tab" id="tab-buddy">
+    <h1 class="large">陪伴</h1>
+    <p class="lead">看清自己的规律，找到对你真正有用的办法。</p>
+
+    <div class="eyebrow" style="margin-top:4px">最近 7 天</div>
+    <div class="card">
+      <div class="card-head"><h3>每日吸烟量</h3><span class="legend" id="weekLegend"></span></div>
+      <div class="week" id="week"></div>
+      <div class="kpis kpis4" id="kpis"></div>
+      <p class="foot" id="weekNote" style="margin:10px 0 0"></p>
+    </div>
+
+    <div class="card nextweek">
+      <h3>下周试试这一件事</h3>
+      <div id="nextWeek"></div>
+    </div>
+
+    <div class="eyebrow">对你有效的方法</div>
+    <div class="card"><div id="methodBars"></div></div>
+
+    <div class="eyebrow">想抽 / 抽烟的场景</div>
+    <div class="card"><div id="triggerBars"></div></div>
+
+    <div class="eyebrow">聊聊</div>
+    <div class="card">
+      <h3>戒烟伙伴</h3>
+      <p class="hint">本地规则回复 · 对话不会发送到任何服务器 · 不做诊断</p>
+      <div class="chat" id="chat"></div>
+      <div class="quick" id="quick"></div>
+      <form class="composer" id="composer">
+        <input id="chatInput" placeholder="说说现在的感受…" autocomplete="off">
+        <button type="submit" aria-label="发送">↑</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<!-- ============ 项目介绍（#about） ============ -->
+<main class="about" id="aboutView" hidden>
+  <nav class="about-nav"><a href="#" id="aboutBack">← 打开应用</a><span>作品集 · 产品设计与前端实现</span></nav>
+
+  <header class="about-hero">
+    <p class="kicker">每一根 · 戒烟陪伴 Web 应用</p>
+    <h1>每一根都记下来，<br>但一次复吸不让你从零开始。</h1>
+    <p class="about-lead">戒烟最难的是两个时刻：烟瘾冲上来的那几分钟，和抽了之后觉得"前功尽弃"的那一刻。这个项目围绕这两个时刻设计：烟瘾急救，以及复吸后继续陪伴。</p>
+    <div class="about-cta"><a class="btn primary" href="#">打开演示</a><span class="hint">无需注册，内置模拟数据，可随时重置</span></div>
+  </header>
+
+  <section class="about-sec">
+    <h2>问题与目标</h2>
+    <div class="about-cols">
+      <div><h3>观察到的问题</h3><ul>
+        <li>多数戒烟 App 以"连续无烟天数"为核心，一次复吸就清零，用户容易就此放弃。</li>
+        <li>烟瘾发作时，泛泛的建议（"坚持住"）帮不上忙，人需要一个马上能做的动作。</li>
+        <li>不同的人、不同场景下有效的方法不一样，但很少有产品记录"什么对你有用"。</li>
+      </ul></div>
+      <div><h3>产品目标</h3><ul>
+        <li>帮用户撑过渴求高峰：按场景和强度给出一个具体动作。</li>
+        <li>复吸后不清零：记录诱因、给出下一步，累计进度保持不变。</li>
+        <li>每周给出一条可执行的建议，并追踪它有没有被用上。</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="about-sec">
+    <h2>目标用户</h2>
+    <p class="about-note">以下是设计时的用户假设，尚未经过用户访谈验证。</p>
+    <div class="persona">
+      <div><b>想戒或想减量的成年吸烟者</b><span>每天 10–20 根，尝试过戒烟但反复过；高频场景是饭后、工作压力和社交。</span></div>
+      <div><b>核心需求</b><span>烟瘾上来时有东西可以"抓住"；抽了之后不被责备；知道自己在哪些场景最容易失守。</span></div>
+    </div>
+  </section>
+
+  <section class="about-sec">
+    <h2>关键流程</h2>
+    <ol class="flow">
+      <li><b>设定目标</b><span>选择"彻底戒烟"或"逐步减量"，填写每天支数和价格作为基线。减量模式每周目标比基线降低 20%。</span></li>
+      <li><b>一键记录</b><span>"忍住了"一键记下，可撤销；"抽了一根"记录场景，可补记更早的时间。</span></li>
+      <li><b>烟瘾急救</b><span>选场景和渴求强度 → 推荐一个动作并计时 → 结果（挺过去 / 还是抽了）→ 评价方法是否有效。</span></li>
+      <li><b>复吸后的下一步</b><span>不评判；展示仍然有效的累计进度，并针对这次的诱因给出下次可以提前做的事。</span></li>
+      <li><b>每周回顾</b><span>7 日趋势、与基线和目标对比、最有效的方法，以及"下周试试这一件事"。</span></li>
+    </ol>
+  </section>
+
+  <section class="about-sec">
+    <h2>差异点：会学习的烟瘾急救</h2>
+    <p>急救方法库有 11 个动作（慢呼吸、冲动冲浪、离开现场、刷牙、拒绝句等），每个动作标注适合的场景和渴求强度。推荐分数由三部分组成：</p>
+    <pre class="formula">得分 = 场景匹配（通用 +1 / 匹配 +3）
+     + 强度匹配（在区间内 +2 / 否则 −2）
+     + 个人效果（有帮助 +2、一般 +0.5、没帮助 −1.5；挺过去 +0.5、抽了 −0.5；同场景记录 ×1.5）</pre>
+    <p>用户评价越多，推荐越偏向"对这个人在这个场景下有效"的方法。用户关闭个性化授权后，只按场景和强度推荐。</p>
+  </section>
+
+  <section class="about-sec">
+    <h2>隐私设计</h2>
+    <ul>
+      <li>所有记录、打卡、急救评价和对话只保存在用户浏览器的 localStorage 中，应用本身不发送任何网络请求。</li>
+      <li>陪伴对话由本地规则生成。涉及危机、急症和用药的话题使用固定回复，并给出 12356、120、12320 等求助渠道。</li>
+      <li>设置中可以一键清除全部数据；演示数据单独标注，可随时重置或退出。</li>
+    </ul>
+    <div class="callout"><b>一次取舍</b>开发中曾尝试在前端直接接入云端大模型（Claude、硅基流动、Gemini）。纯静态页面调用这些服务必须把 API 密钥放在浏览器里，任何访客都能拿到。因此公开版移除了云端 AI，改为本地规则回复，并在启动时清除旧版本留在浏览器里的密钥。之后如需接入，计划通过服务端代理转发，并在发送任何内容前单独征得用户同意。</div>
+  </section>
+
+  <section class="about-sec">
+    <h2>技术方案</h2>
+    <div class="tech">
+      <div><b>前端</b><span>原生 HTML / CSS / JavaScript，无框架、无第三方依赖，静态托管即可运行。</span></div>
+      <div><b>数据</b><span>localStorage 单一状态对象；事件流（抽烟 / 忍住）带 id，支持撤销和补记；旧版数据自动迁移。</span></div>
+      <div><b>统计口径</b><span>"少抽的烟"= 基线 × 天数 − 实际记录，首页累计和周报共用同一个函数，避免数字互相对不上。</span></div>
+      <div><b>界面</b><span>移动端优先，深浅色模式，尊重"减少动态效果"系统设置。</span></div>
+    </div>
+  </section>
+
+  <section class="about-sec">
+    <h2>迭代记录</h2>
+    <ol class="iter">
+      <li><b>v1 原型</b><span>记录、恢复时间线、"一根烟"长按模拟：展示一根烟的焦油、尼古丁和一氧化碳。</span></li>
+      <li><b>烟品搜索</b><span>每个人抽的烟不同，只有一个品牌时数字和用户无关。加入约 150 个国内外烟品规格的搜索，未收录的按常见标示估算并注明。</span></li>
+      <li><b>云端 AI 尝试与回退</b><span>接入大模型后发现密钥暴露风险，公开版回退为本地规则（见隐私设计）。</span></li>
+      <li><b>v2 重构</b><span>把重心从"展示危害"转向"急救 + 复吸后陪伴"：急救按场景与强度推荐并收集效果反馈；复吸不清零累计进度；记录支持撤销和补记；修正减量目标和周报口径；加入演示模式。</span></li>
+    </ol>
+  </section>
+
+  <section class="about-sec">
+    <h2>数据说明与局限</h2>
+    <ul>
+      <li>每根烟约减少 11 分钟预期寿命来自人群统计（Shaw 等，BMJ 2000）；恢复时间线参考 WHO 和美国 CDC。应用内的寿命、恢复和焦油数字都是估算，不代表个人医学结果。</li>
+      <li>烟品焦油、烟碱、一氧化碳为包装标示的近似值，不同批次和市场会有差异。</li>
+      <li>目前没有真实用户数据，演示数据为程序生成。下一步计划邀请 5 位吸烟者做可用性测试，关注三个指标：急救流程的完成率、急救后"挺过去"的比例、复吸后 7 天内是否继续记录。</li>
+    </ul>
+  </section>
+
+  <footer class="about-foot">本应用提供行为支持与健康科普，不提供诊断或用药建议。中国戒烟咨询可拨打 12320 卫生热线。</footer>
+</main>
+
+<button class="sos" id="sosBtn">🫁 想抽了</button>
+
+<nav class="tabbar" id="tabbar">
+  <div class="in">
+    <button class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>今天</button>
+    <button data-tab="cig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="13" width="17" height="4" rx="1"/><path d="M15 13v4M21 13v4M18 9c0-2 3-2 3-4"/></svg>一根烟</button>
+    <button data-tab="heal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg>恢复</button>
+    <button data-tab="buddy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>陪伴</button>
+  </div>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- 欢迎 / 设定目标 -->
+<div class="sheet" id="welcome">
+  <div class="grab"></div>
+  <div id="wIntro">
+    <h2>每一根</h2>
+    <p class="sub">每一根都记下来，但一次复吸不让你从零开始。</p>
+    <ul class="wlist">
+      <li><b>烟瘾急救</b>按场景和强度给你一个马上能做的动作，并记住哪些对你有用。</li>
+      <li><b>复吸后继续陪伴</b>抽了也不清零，帮你复盘诱因、准备下一次。</li>
+      <li><b>只存在你的设备上</b>不注册、不上传，随时可以清除。</li>
+    </ul>
+    <button class="btn primary" id="wDemo">直接体验演示</button>
+    <button class="btn ghost" style="margin-top:10px" id="wSelf">开始记录我自己的</button>
+    <a class="link center" href="#about" id="wAbout">了解这个项目 →</a>
+  </div>
+  <div id="wForm" hidden>
+    <h2>设定你的目标</h2>
+    <p class="sub">只需要 3 项，其余都可以以后再填。</p>
+    <div class="field"><label>目标</label><div class="seg" id="oMode"><button class="on" data-v="quit">彻底戒烟</button><button data-v="reduce">逐步减量</button></div></div>
+    <p class="hint sub" id="oModeHint" style="margin:-6px 4px 0">从现在开始不抽。抽了也没关系，记下来就好。</p>
+    <div class="row">
+      <div class="field"><label for="oBase">平时每天抽几根</label><input id="oBase" type="number" min="1" max="80" value="15" inputmode="numeric"></div>
+      <div class="field"><label for="oPrice">每包价格（¥）</label><input id="oPrice" type="number" min="1" value="25" inputmode="decimal"></div>
+    </div>
+    <div class="field"><label for="oName">怎么称呼你（可选）</label><input id="oName" placeholder="例如：小林" maxlength="12"></div>
+    <div class="toggle"><span>用我的记录个性化推荐急救方法</span><label class="switch"><input type="checkbox" id="oConsent" checked><i></i></label></div>
+    <div class="disclaimer">本应用提供行为支持与健康科普，不提供诊断、用药建议或戒断效果承诺。如有胸痛、呼吸困难等症状，请立即就医。</div>
+    <button class="btn primary" style="margin-top:16px" id="oStart">从现在开始</button>
+    <button class="link center" id="oBack">← 返回</button>
+  </div>
+</div>
+
+<!-- 记录 / 补记 -->
+<div class="sheet" id="logSheet">
+  <div class="grab"></div>
+  <div id="lForm">
+    <h2 id="lTitle">记一笔</h2>
+    <div class="field"><label>发生了什么</label><div class="seg" id="lType"><button data-v="smoke" class="on">抽了一根</button><button data-v="resist">忍住了</button></div></div>
+    <div class="field"><label>什么时候</label><div class="chips" id="lWhen"></div>
+      <input id="lAt" type="datetime-local" hidden style="margin-top:10px"></div>
+    <div class="field"><label>当时的场景</label><div class="chips" id="lTrig"></div></div>
+    <button class="btn primary" id="lSave" style="margin-top:8px">记下来</button>
+  </div>
+  <div id="lAfter" hidden>
+    <h2>这一根已经记下</h2>
+    <p class="sub">复吸是很多人戒烟路上的一部分。它不会清零你的进度，这些都还在：</p>
+    <div class="kpis" id="lKeep"></div>
+    <div class="tip" id="lNext"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn primary" id="lSos">做 1 分钟呼吸</button>
+      <button class="btn ghost" id="lDone">好的</button>
+    </div>
+  </div>
+</div>
+
+<!-- 烟瘾急救 SOS -->
+<div class="sheet" id="sos">
+  <div class="grab"></div>
+  <div id="sosAsk">
+    <h2>先停 10 秒</h2>
+    <p class="sub">告诉我现在的情况，我给你一个马上能做的办法。</p>
+    <div class="field"><label>是什么让你想抽？</label><div class="chips" id="sosTrig"></div></div>
+    <div class="field"><label>有多想抽？</label><div class="seg" id="sosLv"></div><div class="seg-cap"><span>有一点</span><span>非常想</span></div></div>
+    <button class="btn primary" id="sosGo">给我一个办法</button>
+  </div>
+  <div id="sosDo" hidden>
+    <p class="kicker" id="sosCtx"></p>
+    <h2 id="sosName"></h2>
+    <p class="sub" id="sosWhy"></p>
+    <div class="breath" id="sosBreath"><div class="orb" id="orb"></div><div class="txt" id="breathTxt">准备<small>跟着我</small></div></div>
+    <p class="howto" id="sosDesc"></p>
+    <div class="timer"><span>建议时长</span><b id="sosLeft">1:00</b><div class="bar"><i id="sosBar"></i></div></div>
+    <p class="hint sub" style="text-align:center;margin-top:8px">渴求通常在几分钟内到达高峰，然后减弱。</p>
+    <button class="link center" id="sosSwap">换一个办法</button>
+    <div class="row" style="margin-top:6px">
+      <button class="btn green" id="sosWin">挺过去了</button>
+      <button class="btn ghost" id="sosLose">还是抽了</button>
+    </div>
+  </div>
+  <div id="sosDone" hidden>
+    <h2 id="sosDoneTitle"></h2>
+    <p class="sub" id="sosDoneSub"></p>
+    <div class="field"><label id="sosRateQ">刚才的办法对你有帮助吗？</label><div class="seg" id="sosRate"><button data-v="good">有帮助</button><button data-v="ok">一般</button><button data-v="bad">没帮助</button></div></div>
+    <div class="tip" id="sosNext" hidden></div>
+    <button class="btn primary" id="sosFinish" style="margin-top:14px">完成</button>
+  </div>
+</div>
+
+<!-- 设置与隐私 -->
+<div class="sheet" id="settings">
+  <div class="grab"></div>
+  <h2>设置与隐私</h2>
+  <div class="field"><label>外观</label><div class="seg" id="themeSeg"><button data-v="auto">自动</button><button data-v="light">浅色</button><button data-v="dark">深色</button></div></div>
+  <div class="toggle"><span>用我的记录个性化推荐急救方法</span><label class="switch"><input type="checkbox" id="sConsent"><i></i></label></div>
+  <div class="field"><label>你的数据去了哪里</label>
+    <ul class="privacy">
+      <li class="ok">记录、打卡、急救评价和对话<b>只保存在这台设备的浏览器里</b>。</li>
+      <li class="ok">这个版本<b>不连接任何云端 AI 或服务器</b>，应用不会把你的数据发送出去。</li>
+      <li class="warn">换浏览器、清除浏览器数据或使用无痕模式，记录会丢失。</li>
+      <li class="info">如果将来加入云端 AI，会单独询问你，并说明会发送哪些内容。</li>
+    </ul>
+  </div>
+  <button class="btn ghost" id="demoBtn">载入演示数据</button>
+  <button class="btn ghost danger" style="margin-top:10px" id="resetBtn">清除全部数据</button>
+  <a class="btn ghost" style="margin-top:10px" href="#about" id="sAbout">关于这个项目</a>
+  <div class="disclaimer">本应用为行为支持工具，不替代医生。中国戒烟咨询可拨打 12320 卫生热线；心理援助热线 12356。</div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
