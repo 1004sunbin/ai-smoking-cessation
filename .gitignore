@@ -3,3 +3,5 @@
 js/config.local.js
 *.local.js
 .env
+__pycache__/
+*.pyc
