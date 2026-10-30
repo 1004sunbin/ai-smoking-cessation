@@ -154,7 +154,7 @@ const RATING = {good:'有帮助', ok:'一般', bad:'没帮助'};
 /* ---------- state ---------- */
 let S = load();
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
-function blank(){return {v:2,setup:false,demo:false,name:'',mode:'quit',base:15,price:25,brand:'万宝路(红)',why:[],consent:true,start:Date.now(),events:[],sos:[],plan:null,checkins:{},chat:[],theme:'auto'}}
+function blank(){return {v:2,setup:false,demo:false,name:'',mode:'quit',base:15,price:25,brand:'万宝路(红)',why:[],consent:true,start:Date.now(),events:[],sos:[],plan:null,checkins:{},chat:[],theme:'auto',aiOn:false,aiAsked:false}}
 function load(){
   let r=null;
   try{r=JSON.parse(localStorage.getItem(KEY))}catch(e){}
@@ -288,9 +288,8 @@ $('#oBack').onclick=()=>{$('#wIntro').hidden=false;$('#wForm').hidden=true};
 $('#wAbout').onclick=hide;
 segBind($('#oMode'),v=>{$('#oModeHint').textContent=v==='quit'?'从现在开始不抽。抽了也没关系，记下来就好。':'每周把每日上限降低基线的 20%，一步步减到 0。'});
 $('#oStart').onclick=()=>{
-  const theme=S.theme;
-  S=Object.assign(blank(),{
-    setup:true, theme,
+  S=Object.assign(blank(),{theme:S.theme,aiOn:S.aiOn,aiAsked:S.aiAsked},{
+    setup:true,
     name:$('#oName').value.trim(),
     mode:$('#oMode .on').dataset.v,
     base:Math.min(80,Math.max(1,Math.round(+$('#oBase').value)||15)),
@@ -775,20 +774,26 @@ $('#quick').innerHTML=QUICK.map(q=>`<button>${q}</button>`).join('');
 $('#quick').onclick=e=>{if(e.target.tagName==='BUTTON')userSay(e.target.textContent)};
 $('#composer').onsubmit=e=>{e.preventDefault();const v=$('#chatInput').value.trim();if(!v)return;$('#chatInput').value='';userSay(v)};
 function renderChat(){
-  $('#chat').innerHTML=S.chat.map(m=>`<div class="msg ${m.r}${m.warn?' warn':''}">${esc(m.x)}${m.act?`<br><button class="act" data-act="${m.act}">${m.actLabel}</button>`:''}</div>`).join('');
+  $('#chat').innerHTML=S.chat.map(m=>`<div class="msg ${m.r}${m.warn?' warn':''}${m.typing?' typing':''}">${esc(m.x)}${m.act?`<br><button class="act" data-act="${m.act}">${m.actLabel}</button>`:''}</div>`).join('');
   $('#chat').scrollTop=1e6;
 }
 $('#chat').onclick=e=>{const a=e.target.dataset.act;if(a==='sos')openSOS();if(a==='log')openLog('smoke',false);if(a==='lab')goTab('cig');if(a==='heal')goTab('heal')};
 function agentSay(x,opt={}){S.chat.push(Object.assign({r:'ai',x},opt));S.chat=S.chat.slice(-60);save();renderChat()}
-function userSay(x){S.chat.push({r:'me',x});renderChat();setTimeout(()=>{const r=reply(x);agentSay(r.x,r)},400)}
+function userSay(x){
+  const r=reply(x);
+  const history=aiHistory();   // 发送给 AI 的上下文不含这条，下面单独追加
+  S.chat.push({r:'me',x});renderChat();
+  if(r.warn||!aiActive()){setTimeout(()=>agentSay(r.x,r),400);return}
+  aiSay(r,[...history,{role:'user',content:x}]);
+}
 function welcomeMsg(){
   return `你好${S.name?'，'+S.name:''}！我是你的戒烟伙伴。\n你的目标是「${S.mode==='quit'?'彻底戒烟':'逐步减量'}」，基线每天 ${S.base} 根。\n想抽的时候点右下角「想抽了」；抽了也没关系，记下来，我们一起找规律。`;
 }
 function reply(x){
   const has=re=>re.test(x);
   // safety boundaries first
-  if(has(/自杀|不想活|轻生|结束生命/)) return {x:'听到你这么说我很担心你。你不需要一个人扛着——请现在联系身边信任的人，或拨打全国心理援助热线 12356；如有紧急危险请拨打 120 / 110。我会一直在这里。',warn:true};
-  if(has(/胸痛|胸闷|呼吸困难|喘不上|晕倒|昏|心悸/)) return {x:'这些症状需要专业判断，我不能替你做诊断。如果症状严重或突然出现，请立即拨打 120 或前往急诊。',warn:true};
+  if(has(/自杀|不想活|轻生|结束生命|想死|活着没意思|活不下去|伤害自己|自残|割腕/)) return {x:'听到你这么说我很担心你。你不需要一个人扛着——请现在联系身边信任的人，或拨打全国心理援助热线 12356；如有紧急危险请拨打 120 / 110。我会一直在这里。',warn:true};
+  if(has(/胸痛|胸闷|胸口.{0,4}(痛|疼|闷|紧|压)|心口.{0,3}(痛|疼)|心脏.{0,3}(痛|疼|难受)|呼吸困难|喘不上|喘不过|透不过气|晕倒|昏|心悸|咳血|吐血/)) return {x:'这些症状需要专业判断，我不能替你做诊断。如果症状严重或突然出现，请立即拨打 120 或前往急诊。',warn:true};
   if(has(/药|贴片|尼古丁贴|口香糖|伐尼克兰|安非他酮|电子烟|加热烟/)) return {x:'戒烟药物和尼古丁替代疗法确实能提高成功率，但是否适合你、怎么用、用多少，需要医生根据你的情况判断，我不提供用药建议。你可以去医院戒烟门诊，或拨打 12320 卫生热线咨询。\n另外，电子烟和加热烟并非无害，不建议当作戒烟手段自行替代。',warn:true};
   if(has(/保证|一定能|多久能戒|会不会得癌|得癌|能活多久/)) return {x:'我没法承诺结果，每个人情况不同。我能确定的是：从停下的那一刻起，身体就开始修复，越早越好。要不要看看你已经解锁的恢复节点？',act:'heal',actLabel:'查看恢复进度'};
   // intents
@@ -808,17 +813,133 @@ function reply(x){
   return {x:`我在听。能说说此刻是什么场景吗？比如${TRIGGERS.slice(0,4).join('、')}……知道场景后我能给你更具体的办法。`};
 }
 
+
+/* ---------- AI 陪伴 ----------
+ * 两种来源：本机直连（js/config.local.js 里的 Key，已被 .gitignore 忽略）优先；
+ * 否则走线上转发服务（js/ai-config.js 里的地址，Key 只存在云函数里）。 */
+const AI = (()=>{
+  const c=window.MEIYIGEN_AI;
+  if(c&&c.key&&!/填/.test(c.key)) return Object.assign({mode:'local'},c);
+  const p=window.MEIYIGEN_PROXY;
+  return p&&p.url?Object.assign({mode:'proxy'},p):null;
+})();
+function aiProfile(){
+  const best=Object.keys(METHODS).map(id=>({id,...methodStats(id,null)})).filter(m=>m.good).sort((a,b)=>b.good-a.good)[0];
+  return {mode:S.mode,base:S.base,target:targetFor(Date.now()),day:dayNo(),avoided:Math.floor(avoided()),resists:resists().length,
+    trigger:S.consent?personalTrigger():null,best:S.consent&&best?METHODS[best.id].name:null};
+}
+const aiActive = () => !!(AI&&S.aiOn);
+function aiSystemPrompt(){
+  const trig=personalTrigger(), best=Object.keys(METHODS).map(id=>({id,...methodStats(id,null)})).filter(m=>m.good).sort((a,b)=>b.good-a.good)[0];
+  const ck=S.checkins[dayKey(Date.now())];
+  return `你是「每一根」戒烟 App 里的陪伴伙伴，用简体中文聊天。
+风格：温暖、具体、不说教，像懂行的朋友。每次 2–4 句，口语化，不用 Markdown 标题和列表符号。
+原则：
+- 用户想抽时，先接住情绪，再给一个马上能做的小动作；可以提醒他点右下角「想抽了」做急救。
+- 用户抽了，不批评。强调累计进度不会清零，帮他看清当时的场景和下次怎么提前准备。
+- 不做医学诊断，不给药物或尼古丁替代品的用法用量，建议去戒烟门诊或拨打 12320。
+- 不承诺"一定能戒掉"，不推荐电子烟、加热烟作为替代。
+- 如果用户提到身体不适（胸痛、呼吸困难等），请他立即就医或拨打 120；提到自伤或不想活，请他联系身边的人或拨打心理援助热线 12356，紧急时拨打 120 / 110。
+用户情况（自然地用，不要逐条复述）：
+- 目标：${S.mode==='quit'?'彻底戒烟':'逐步减量'}，基线每天 ${S.base} 根；今天目标 ≤ ${targetFor(Date.now())} 根
+- 第 ${dayNo()} 天；累计比基线少抽约 ${Math.floor(avoided())} 根；忍住 ${resists().length} 次
+${S.consent&&trig?`- 最常见的诱因：${trig}\n`:''}${S.consent&&best?`- 对他最有效的急救方法：${METHODS[best.id].name}（有帮助 ${best.good} 次）\n`:''}${ck?`- 今天打卡：心情 ${ck.mood+1}/5，渴求 ${ck.crave}/5\n`:''}`;
+}
+function aiHistory(){
+  const msgs=[];
+  for(const m of S.chat.filter(m=>!m.typing).slice(-16)){
+    const role=m.r==='me'?'user':'assistant';
+    if(!msgs.length&&role!=='user') continue;
+    const last=msgs[msgs.length-1];
+    if(last&&last.role===role) last.content+='\n'+m.x; else msgs.push({role,content:m.x});
+  }
+  return msgs;
+}
+let aiBusy=false;
+async function aiSay(local,messages){
+  if(aiBusy){setTimeout(()=>agentSay(local.x,local),400);return}
+  aiBusy=true;
+  const m={r:'ai',x:'正在输入…',typing:true};
+  S.chat.push(m);renderChat();
+  try{
+    // 线上转发只发聊天内容和几项统计数字，系统提示词由服务端拼
+    const req=AI.mode==='proxy'
+      ? {headers:{'content-type':'application/json'},body:{messages:messages.slice(-10),profile:aiProfile()}}
+      : {headers:{'content-type':'application/json','authorization':'Bearer '+AI.key},
+         body:Object.assign({model:AI.model,stream:true,max_tokens:800,messages:[{role:'system',content:aiSystemPrompt()},...messages]},AI.extra||{})};
+    let res;
+    try{res=await fetch(AI.url,{method:'POST',headers:req.headers,body:JSON.stringify(req.body)})}
+    catch(e){throw new Error('连不上 AI 服务，请检查网络')}
+    if(!res.ok){
+      const t=await res.text().catch(()=>''); let msg='';
+      try{msg=JSON.parse(t).error}catch(e){}
+      if(typeof msg!=='string') msg=msg&&msg.message||'';
+      throw new Error(msg||`HTTP ${res.status}`+(/api.?key|invalid|unauth/i.test(t)?'，Key 无效或已撤销':''));
+    }
+    const reader=res.body.getReader(), dec=new TextDecoder();
+    let buf='', text='';
+    for(;;){
+      const {done,value}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n'); buf=lines.pop();
+      for(const line of lines){
+        if(!line.startsWith('data:')) continue;
+        const data=line.slice(5).trim(); if(data==='[DONE]') continue;
+        let ev; try{ev=JSON.parse(data)}catch(e){continue}
+        const d=ev.choices&&ev.choices[0]&&ev.choices[0].delta&&ev.choices[0].delta.content;
+        if(d){text+=d;m.x=text.replace(/^\s+/,'');m.typing=false;renderChat()}
+      }
+    }
+    if(!text.trim()) throw new Error('没有收到回复');
+    m.x=text.trim();
+    // 本地意图识别出的快捷按钮（呼吸练习、记录这一根等）继续挂在 AI 回复后面
+    if(local.act){m.act=local.act;m.actLabel=local.actLabel}
+  }catch(e){
+    Object.assign(m,{x:local.x+`\n\n（AI 暂时不可用：${e.message}。以上为本地回复）`,act:local.act,actLabel:local.actLabel});
+  }finally{
+    delete m.typing; aiBusy=false; S.chat=S.chat.slice(-60); save(); renderChat();
+  }
+}
+
 /* ---------- 设置与隐私 ---------- */
-$('#openSettings').onclick=()=>{$('#sConsent').checked=S.consent;$('#demoBtn').textContent=S.demo?'重置演示数据':'载入演示数据（会替换当前记录）';armReset(false);applyTheme();show('#settings')};
+function renderSettings(){
+  $('#sConsent').checked=S.consent;
+  $('#sAiRow').hidden=!AI;
+  if(AI){$('#sAi').checked=S.aiOn;$('#sAiTag').textContent=AI.mode==='local'?'仅本机':'Beta';$('#sAiSub').textContent=`使用 ${AI.name} 生成聊天回复。开启后，聊天内容和你的统计摘要会${AI.mode==='proxy'?'经本项目的服务器转发':'发送'}给 ${AI.name}`}
+  $('#demoTitle').textContent=S.demo?'重置演示数据':'载入演示数据';
+  $('#demoSub').textContent=S.demo?'恢复到初始的模拟数据':'用模拟数据替换当前记录';
+  renderPrivacy(); armReset(false); applyTheme();
+}
+function renderPrivacy(){
+  const ai=aiActive();
+  $('#pIcon').classList.toggle('ai',ai);
+  $('#pTitle').textContent=ai?'记录在本机，聊天会发送给 AI':'数据只保存在这台设备上';
+  $('#pSub').textContent=ai?`已开启 AI 陪伴，聊天内容会发送给 ${AI.name}`:'不注册、不上传，应用不会把记录发送出去';
+  $('#pAiLine').textContent=ai
+    ?`AI 陪伴已开启：你在「陪伴」里发的消息，以及统计摘要（坚持天数、少抽支数、常见诱因），会${AI.mode==='proxy'?'经本项目的服务器（不记录聊天内容）转发':'发送'}给 ${AI.name} 生成回复。其他记录不会发送。关闭后立即停止。`
+    :'陪伴对话由本地规则生成，不经过任何服务器。';
+  if(AI){
+    $('#aiAsk').hidden=S.aiOn||S.aiAsked;
+    $('#aiAskText').textContent=`由 ${AI.name} 生成回复。你在这里发的消息，以及统计摘要（坚持天数、少抽支数、常见诱因），会${AI.mode==='proxy'?'经本项目的服务器转发':'发送'}给 ${AI.name}。危机、急症和用药相关的话题仍使用固定回复。可以随时在设置里关闭。`;
+  }
+  $('#chatHint').textContent=ai?`AI 回复（${AI.name}）· 聊天内容会发送给 ${AI.name} · 不做诊断`:'本地规则回复 · 对话不会发送到任何服务器 · 不做诊断';
+}
+$('#openSettings').onclick=()=>{renderSettings();show('#settings')};
+$('#sClose').onclick=hide;
 segBind($('#themeSeg'),v=>{S.theme=v;save();applyTheme()});
 $('#sConsent').onchange=e=>{S.consent=e.target.checked;save();renderAll()};
+$('#sAi').onchange=e=>{S.aiOn=e.target.checked;S.aiAsked=true;save();renderPrivacy();toast(S.aiOn?`已开启 AI 陪伴（${AI.name}）`:'已关闭 AI 陪伴，改用本地回复')};
 $('#sAbout').onclick=hide;
-// 页面里不能用 confirm()，清除数据改为"再点一次确认"
+$('#aiYes').onclick=()=>{S.aiOn=true;S.aiAsked=true;save();renderPrivacy();toast('已开启 AI 回复')};
+$('#aiNo').onclick=()=>{S.aiOn=false;S.aiAsked=true;save();renderPrivacy();toast('好的，继续使用本地回复，可在设置里开启')};
+// 页面里不能用 confirm()，危险操作改为"再点一次确认"
 let resetArmed=0;
 function armReset(on){
   clearTimeout(resetArmed); const b=$('#resetBtn');
-  b.textContent=on?'再点一次，确认清除全部数据':'清除全部数据'; b.classList.toggle('armed',on);
-  if(on) resetArmed=setTimeout(()=>armReset(false),4000); else resetArmed=0;
+  b.querySelector('b').textContent=on?'再点一次，确认清除':'清除全部数据';
+  b.querySelector('small').textContent=on?'4 秒内再点一次才会执行':'删除这台设备上的所有记录，无法恢复';
+  b.classList.toggle('armed',on);
+  resetArmed=on?setTimeout(()=>armReset(false),4000):0;
 }
 $('#resetBtn').onclick=()=>{
   if(!$('#resetBtn').classList.contains('armed')){armReset(true);return}
@@ -827,10 +948,13 @@ $('#resetBtn').onclick=()=>{
   const theme=S.theme; S=blank(); S.theme=theme; applyTheme();
   hide(); renderAll(); openWelcome(true); toast('已清除这台设备上的全部数据');
 };
-let demoArmed=false;
+let demoArmed=0;
 $('#demoBtn').onclick=()=>{
-  if(!S.demo&&S.setup&&S.events.length&&!demoArmed){demoArmed=true;$('#demoBtn').textContent='你的记录会被替换，再点一次确认';setTimeout(()=>{demoArmed=false},4000);return}
-  demoArmed=false; loadDemo(); hide(); toast('已载入演示数据');
+  if(!S.demo&&S.setup&&S.events.length&&!demoArmed){
+    $('#demoTitle').textContent='再点一次，用演示数据替换';$('#demoSub').textContent='你现在的记录会被覆盖';
+    demoArmed=setTimeout(()=>{demoArmed=0;renderSettings()},4000);return;
+  }
+  clearTimeout(demoArmed);demoArmed=0; loadDemo(); hide(); toast('已载入演示数据');
 };
 $('#demoReset').onclick=()=>{loadDemo();toast('演示数据已重置')};
 $('#demoExit').onclick=()=>openWelcome(true);
@@ -839,8 +963,8 @@ $('#demoExit').onclick=()=>openWelcome(true);
 function rng(seed){return ()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function loadDemo(){
   const R=rng(20261029), pick=a=>a[Math.floor(R()*a.length)], now=Date.now();
-  const theme=S.theme;
-  S=Object.assign(blank(),{setup:true,demo:true,theme,name:'小林',mode:'reduce',base:15,price:25,brand:'中华(硬)',why:['健康','家人']});
+  const keep={theme:S.theme,aiOn:S.aiOn,aiAsked:S.aiAsked};
+  S=Object.assign(blank(),keep,{setup:true,demo:true,name:'小林',mode:'reduce',base:15,price:25,brand:'中华(硬)',why:['健康','家人']});
   const D=12; S.start=dayStart(now,-D)+8*HOUR;
   S.plan={t:dayStart(now,-5)+20*HOUR,trigger:'饭后',method:'brush'};
   const trigW=['饭后','饭后','饭后','压力','压力','压力','咖啡/茶','社交','喝酒','无聊','起床'];
@@ -899,6 +1023,7 @@ let firstVisit=false;
 if(!S.setup){firstVisit=true; loadDemo()}   // 首次打开先展示带演示数据的完整界面，再弹出欢迎卡片
 else {setBrand(S.brand); renderAll(); renderChat()}
 setInterval(tick,1000);
+renderPrivacy();
 route();
 if(firstVisit && location.hash!=='#about') setTimeout(()=>openWelcome(false),350);
 })();
