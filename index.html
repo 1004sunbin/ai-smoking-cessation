@@ -199,7 +199,7 @@
     <p class="kicker">每一根 · 戒烟陪伴 Web 应用</p>
     <h1>每一根都记下来，<br>但一次复吸不让你从零开始。</h1>
     <p class="about-lead">戒烟最难的是两个时刻：烟瘾冲上来的那几分钟，和抽了之后觉得"前功尽弃"的那一刻。这个项目围绕这两个时刻设计：烟瘾急救，以及复吸后继续陪伴。</p>
-    <div class="about-cta"><a class="btn primary" href="#">打开演示</a><span class="hint">无需注册，内置模拟数据，可随时重置</span></div>
+    <div class="about-cta"><a class="btn primary" href="#">打开应用</a><span class="hint">无需注册，数据只存在你的设备上；想先看效果，可在设置里载入示例数据</span></div>
   </header>
 
   <section class="about-sec">
@@ -275,7 +275,7 @@
       <li><b>v1 原型</b><span>记录、恢复时间线、"一根烟"长按模拟：展示一根烟的焦油、尼古丁和一氧化碳。</span></li>
       <li><b>烟品搜索</b><span>每个人抽的烟不同，只有一个品牌时数字和用户无关。加入约 150 个国内外烟品规格的搜索，未收录的按常见标示估算并注明。</span></li>
       <li><b>云端 AI 尝试与回退</b><span>前端直连大模型有密钥暴露风险，先回退为本地规则（见隐私设计）。</span></li>
-      <li><b>v2 重构</b><span>把重心从"展示危害"转向"急救 + 复吸后陪伴"：急救按场景与强度推荐并收集效果反馈；复吸不清零累计进度；记录支持撤销和补记；修正减量目标和周报口径；加入演示模式。</span></li>
+      <li><b>v2 重构</b><span>把重心从"展示危害"转向"急救 + 复吸后陪伴"：急救按场景与强度推荐并收集效果反馈；复吸不清零累计进度；记录支持撤销和补记；修正减量目标和周报口径；加入可重置的示例数据（在设置中载入）。</span></li>
       <li><b>AI 陪伴上线</b><span>加入云函数转发、限流和安全话题本地拦截。最初需要访客点击同意才开启，试用中觉得多了一步阻碍，改为默认开启、在聊天框下方说明并可在设置中关闭；测试中发现"胸口有点痛"这类说法没被识别为急症，扩充了识别规则，并在 AI 提示词里加了第二道保险。</span></li>
     </ol>
   </section>
@@ -316,8 +316,7 @@
       <li><b>复吸后继续陪伴</b>抽了也不清零，帮你复盘诱因、准备下一次。</li>
       <li><b>只存在你的设备上</b>不注册、不上传，随时可以清除。</li>
     </ul>
-    <button class="btn primary" id="wDemo">直接体验演示</button>
-    <button class="btn ghost" style="margin-top:10px" id="wSelf">开始记录我自己的</button>
+    <button class="btn primary" id="wSelf">开始使用</button>
     <a class="link center" href="#about" id="wAbout">了解这个项目 →</a>
   </div>
   <div id="wForm" hidden>

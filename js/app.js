@@ -258,8 +258,9 @@ function show(id){
   if(openSheet&&openSheet!==$(id)){openSheet.classList.remove('show');if(openSheet.id==='sos')stopTimers()}
   openSheet=$(id);$('#scrim').classList.add('show');openSheet.classList.add('show');openSheet.scrollTop=0;
 }
-function hide(){
+function hide(force){
   if(!openSheet)return;
+  if(openSheet.id==='welcome'&&!S.setup&&force!==true)return;
   openSheet.classList.remove('show');$('#scrim').classList.remove('show');
   if(openSheet.id==='sos')stopTimers();
   openSheet=null;
@@ -282,7 +283,6 @@ function openWelcome(form){
   $('#wIntro').hidden=!!form; $('#wForm').hidden=!form;
   show('#welcome');
 }
-$('#wDemo').onclick=()=>{if(!S.demo)loadDemo();hide();toast('这是演示数据，可以随便点')};
 $('#wSelf').onclick=()=>{$('#wIntro').hidden=true;$('#wForm').hidden=false;$('#welcome').scrollTop=0};
 $('#oBack').onclick=()=>{$('#wIntro').hidden=false;$('#wForm').hidden=true};
 $('#wAbout').onclick=hide;
@@ -298,13 +298,12 @@ $('#oStart').onclick=()=>{
     start:Date.now()
   });
   S.chat=[{r:'ai',x:welcomeMsg()}];
-  save(); hide(); setBrand(S.brand); renderAll(); goTab('today');
+  save(); hide(); setBrand(S.brand); renderAll(); renderChat(); goTab('today');
   toast('开始了。想抽的时候，点右下角「想抽了」');
 };
 
 /* ---------- today ---------- */
 function tick(){
-  if(!S.setup) return;
   $('#clock').innerHTML=fmtDur(Date.now()-lastSmoke());
   const a=avoided();
   $('#sAvoided').innerHTML=`${Math.floor(a)}<small>根</small>`;
@@ -1005,7 +1004,7 @@ function route(){
   const about=location.hash==='#about';
   document.body.classList.toggle('about-mode',about);
   $('#aboutView').hidden=!about;
-  if(about){hide();window.scrollTo({top:0})}
+  if(about){hide(true);window.scrollTo({top:0})}
 }
 $$('#aboutView a[href="#"]').forEach(a=>a.onclick=e=>{e.preventDefault();history.replaceState(null,'',location.pathname);route();if(!S.setup)openWelcome(false)});
 window.addEventListener('hashchange',route);
@@ -1013,13 +1012,12 @@ window.addEventListener('hashchange',route);
 /* ---------- boot ---------- */
 function renderAll(){
   $('#demoBar').hidden=!S.demo;
-  if(!S.setup) return;
   renderToday(); renderHeal(); renderBuddy(); calc();
 }
 applyTheme();
-let firstVisit=false;
-if(!S.setup){firstVisit=true; loadDemo()}   // 首次打开先展示带演示数据的完整界面，再弹出欢迎卡片
-else {setBrand(S.brand); renderAll(); renderChat()}
+// 首次打开：背后是空白的正式版界面，弹出欢迎卡片设定目标；演示数据只在设置里手动载入
+const firstVisit=!S.setup;
+setBrand(S.brand); renderAll(); renderChat();
 setInterval(tick,1000);
 renderPrivacy();
 route();
