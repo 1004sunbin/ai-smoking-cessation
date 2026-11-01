@@ -828,7 +828,8 @@ function aiProfile(){
   return {mode:S.mode,base:S.base,target:targetFor(Date.now()),day:dayNo(),avoided:Math.floor(avoided()),resists:resists().length,
     trigger:S.consent?personalTrigger():null,best:S.consent&&best?METHODS[best.id].name:null};
 }
-const aiActive = () => !!(AI&&S.aiOn);
+// AI 默认开启；用户在设置里关掉后记住这个选择
+const aiActive = () => !!(AI&&(S.aiAsked?S.aiOn:true));
 function aiSystemPrompt(){
   const trig=personalTrigger(), best=Object.keys(METHODS).map(id=>({id,...methodStats(id,null)})).filter(m=>m.good).sort((a,b)=>b.good-a.good)[0];
   const ck=S.checkins[dayKey(Date.now())];
@@ -855,7 +856,7 @@ function aiHistory(){
   }
   return msgs;
 }
-let aiBusy=false;
+let aiBusy=false, aiFailNoted=false;
 async function aiSay(local,messages){
   if(aiBusy){setTimeout(()=>agentSay(local.x,local),400);return}
   aiBusy=true;
@@ -872,7 +873,7 @@ async function aiSay(local,messages){
     catch(e){throw new Error('连不上 AI 服务，请检查网络')}
     if(!res.ok){
       const t=await res.text().catch(()=>''); let msg='';
-      try{msg=JSON.parse(t).error}catch(e){}
+      try{const j=JSON.parse(t);msg=j.error||j.Message}catch(e){}
       if(typeof msg!=='string') msg=msg&&msg.message||'';
       throw new Error(msg||`HTTP ${res.status}`+(/api.?key|invalid|unauth/i.test(t)?'，Key 无效或已撤销':''));
     }
@@ -895,7 +896,10 @@ async function aiSay(local,messages){
     // 本地意图识别出的快捷按钮（呼吸练习、记录这一根等）继续挂在 AI 回复后面
     if(local.act){m.act=local.act;m.actLabel=local.actLabel}
   }catch(e){
-    Object.assign(m,{x:local.x+`\n\n（AI 暂时不可用：${e.message}。以上为本地回复）`,act:local.act,actLabel:local.actLabel});
+    // AI 连不上时安静地用本地回复；每次打开页面最多提示一次
+    Object.assign(m,{x:local.x+(aiFailNoted?'':'\n\n（AI 暂时连不上，先用本地回复）'),act:local.act,actLabel:local.actLabel});
+    aiFailNoted=true;
+    console.warn('AI 回复失败：',e.message);
   }finally{
     delete m.typing; aiBusy=false; S.chat=S.chat.slice(-60); save(); renderChat();
   }
@@ -905,7 +909,7 @@ async function aiSay(local,messages){
 function renderSettings(){
   $('#sConsent').checked=S.consent;
   $('#sAiRow').hidden=!AI;
-  if(AI){$('#sAi').checked=S.aiOn;$('#sAiTag').textContent=AI.mode==='local'?'仅本机':'Beta';$('#sAiSub').textContent=`使用 ${AI.name} 生成聊天回复。开启后，聊天内容和你的统计摘要会${AI.mode==='proxy'?'经本项目的服务器转发':'发送'}给 ${AI.name}`}
+  if(AI){$('#sAi').checked=aiActive();$('#sAiTag').textContent=AI.mode==='local'?'仅本机':'Beta';$('#sAiSub').textContent=`使用 ${AI.name} 生成聊天回复。开启后，聊天内容和你的统计摘要会${AI.mode==='proxy'?'经本项目的服务器转发':'发送'}给 ${AI.name}`}
   $('#demoTitle').textContent=S.demo?'重置演示数据':'载入演示数据';
   $('#demoSub').textContent=S.demo?'恢复到初始的模拟数据':'用模拟数据替换当前记录';
   renderPrivacy(); armReset(false); applyTheme();
@@ -918,11 +922,7 @@ function renderPrivacy(){
   $('#pAiLine').textContent=ai
     ?`AI 陪伴已开启：你在「陪伴」里发的消息，以及统计摘要（坚持天数、少抽支数、常见诱因），会${AI.mode==='proxy'?'经本项目的服务器（不记录聊天内容）转发':'发送'}给 ${AI.name} 生成回复。其他记录不会发送。关闭后立即停止。`
     :'陪伴对话由本地规则生成，不经过任何服务器。';
-  if(AI){
-    $('#aiAsk').hidden=S.aiOn||S.aiAsked;
-    $('#aiAskText').textContent=`由 ${AI.name} 生成回复。你在这里发的消息，以及统计摘要（坚持天数、少抽支数、常见诱因），会${AI.mode==='proxy'?'经本项目的服务器转发':'发送'}给 ${AI.name}。危机、急症和用药相关的话题仍使用固定回复。可以随时在设置里关闭。`;
-  }
-  $('#chatHint').textContent=ai?`AI 回复（${AI.name}）· 聊天内容会发送给 ${AI.name} · 不做诊断`:'本地规则回复 · 对话不会发送到任何服务器 · 不做诊断';
+  $('#chatHint').textContent=ai?`AI 回复（${AI.name}）· 消息会${AI.mode==='proxy'?'经本项目服务器转发':'发送'}给 ${AI.name} · 可在设置中关闭 · 不做诊断`:'本地规则回复 · 对话不会发送到任何服务器 · 不做诊断';
 }
 $('#openSettings').onclick=()=>{renderSettings();show('#settings')};
 $('#sClose').onclick=hide;
@@ -930,8 +930,6 @@ segBind($('#themeSeg'),v=>{S.theme=v;save();applyTheme()});
 $('#sConsent').onchange=e=>{S.consent=e.target.checked;save();renderAll()};
 $('#sAi').onchange=e=>{S.aiOn=e.target.checked;S.aiAsked=true;save();renderPrivacy();toast(S.aiOn?`已开启 AI 陪伴（${AI.name}）`:'已关闭 AI 陪伴，改用本地回复')};
 $('#sAbout').onclick=hide;
-$('#aiYes').onclick=()=>{S.aiOn=true;S.aiAsked=true;save();renderPrivacy();toast('已开启 AI 回复')};
-$('#aiNo').onclick=()=>{S.aiOn=false;S.aiAsked=true;save();renderPrivacy();toast('好的，继续使用本地回复，可在设置里开启')};
 // 页面里不能用 confirm()，危险操作改为"再点一次确认"
 let resetArmed=0;
 function armReset(on){
