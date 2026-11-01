@@ -336,7 +336,11 @@ $('#todayLog').onclick=e=>{
   const id=e.target.dataset.del; if(!id) return;
   const ev=removeEvent(id); if(!ev) return;
   renderAll();
-  toast('已删除这条记录',{label:'撤销',fn:()=>{S.events.push(ev);S.events.sort((a,b)=>a.t-b.t);save();renderAll();toast('已恢复')}});
+  toast('已删除这条记录',{label:'撤销',fn:()=>{
+    S.events.push(ev);S.events.sort((a,b)=>a.t-b.t);
+    // 急救产生的记录：把这次急救的结果一起恢复
+    const s=ev.sosId&&S.sos.find(x=>x.id===ev.sosId); if(s) s.outcome=ev.type;
+    save();renderAll();toast('已恢复')}});
 };
 $('#btnResist').onclick=e=>{
   const ev=addEvent({type:'resist',t:Date.now(),via:'quick'});
