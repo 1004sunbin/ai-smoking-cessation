@@ -6,7 +6,8 @@
 <title>每一根</title>
 <meta name="description" content="戒烟助手：烟瘾急救、复吸后继续陪伴，以及会查看你的记录、给出下一步的 AI 助手。">
 <meta name="theme-color" content="#f6f4ef">
-<link rel="stylesheet" href="css/style.css">
+<!-- 改了 CSS / JS 后把 ?v= 改成新的版本号，否则浏览器可能用旧缓存，出现新页面配旧样式 -->
+<link rel="stylesheet" href="css/style.css?v=818a33d">
 </head>
 <body>
 <div class="app" id="appView">
@@ -470,8 +471,8 @@
 <div class="toast" id="toast" role="status"></div>
 
 <!-- 本机私有配置（含 AI Key，已被 .gitignore 忽略）；线上没有这个文件，会走 ai-config.js 里的转发服务 -->
-<script src="js/ai-config.js"></script>
+<script src="js/ai-config.js?v=818a33d"></script>
 <script src="js/config.local.js" onerror="this.remove()"></script>
-<script src="js/app.js"></script>
+<script src="js/app.js?v=818a33d"></script>
 </body>
 </html>
