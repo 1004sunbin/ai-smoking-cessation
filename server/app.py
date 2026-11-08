@@ -1,6 +1,11 @@
 """每一根 · AI 陪伴转发服务
 
 浏览器 -> 本服务（API Key 只存在服务端环境变量里）-> 智谱 GLM。
+两种请求：
+  普通陪伴  {messages, profile}            -> 流式文字回复
+  Agent     {agent: true, messages, profile} -> 一步模型决策（文字或工具调用）
+Agent 的工具在浏览器里执行（记录只存在用户设备上），本服务只转发；
+系统提示词和工具清单都固定在服务端，接口不能被拿去当通用聊天机器人。不需要数据库。
 只用 Python 标准库，可直接部署为阿里云函数计算 / 腾讯云云函数的「Web 函数」（监听 9000 端口）。
 
 环境变量：
@@ -20,6 +25,8 @@ from threading import Lock
 ZHIPU_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 # 先用效果更好的 4.7，免费模型高峰期限流（429）时自动换下一个
 MODELS = ["glm-4.7-flash", "glm-4-flash-250414"]
+# Agent 要靠函数调用：4-flash 基本不调工具，所以在它前面加一个同样免费、工具调用更可靠的 4.5-flash
+AGENT_MODELS = ["glm-4.7-flash", "glm-4.5-flash", "glm-4-flash-250414"]
 # 控制台粘贴时常带进空格、换行、引号或 "Bearer "，统一去掉
 API_KEY = os.environ.get("ZHIPU_API_KEY", "").strip().strip("'\"").strip()
 if API_KEY.lower().startswith("bearer "):
@@ -32,6 +39,47 @@ MAX_MSG_CHARS = 300
 MAX_TURNS = 10
 
 TRIGGERS = {"压力", "饭后", "咖啡/茶", "喝酒", "社交", "无聊", "起床", "开车"}
+TRIGGER_LIST = ["压力", "饭后", "咖啡/茶", "喝酒", "社交", "无聊", "起床", "开车"]
+METHOD_IDS = ["breath", "surf", "delay", "water", "walk", "brush", "mint", "hands", "squats", "script", "text"]
+AGENT_MAX_STEPS = 4  # 一条用户消息最多几轮工具调用
+
+
+def _fn(name, desc, props=None, required=None):
+    return {"type": "function", "function": {"name": name, "description": desc, "parameters": {
+        "type": "object", "properties": props or {}, "required": required or []}}}
+
+
+_TRIG = {"type": "string", "enum": TRIGGER_LIST, "description": "想抽烟的场景"}
+_LV = {"type": "integer", "minimum": 1, "maximum": 5, "description": "渴求强度 1-5"}
+_METHOD = {"type": "string", "enum": METHOD_IDS, "description": "急救方法 id，来自 recommend_methods 的结果"}
+# 工具由浏览器执行：前三个只读用户本机记录的统计结果，offer_* 只是生成卡片，用户点了才会生效
+AGENT_TOOLS = [
+    _fn("get_progress", "查看用户的目标、今天抽了几根、今日目标、累计少抽、忍住次数和坚持天数。"),
+    _fn("find_patterns", "分析最近的记录：最容易抽烟的场景和时段、急救成功率、哪些办法对这个用户有效。",
+        {"days": {"type": "integer", "minimum": 3, "maximum": 30, "description": "分析最近几天，默认 14"}}),
+    _fn("recommend_methods", "按场景和渴求强度，从急救方法库挑出最适合这个用户的 3 个办法，会参考他过去的评价。",
+        {"trigger": _TRIG, "intensity": _LV}, ["intensity"]),
+    _fn("offer_sos", "在对话里给用户一张「开始急救」卡片，点了才开始带计时的急救动作。用户此刻想抽时使用。",
+        {"trigger": _TRIG, "intensity": _LV, "method": _METHOD}, ["method"]),
+    _fn("offer_plan", "建议把「某个场景下先做某个动作」加入用户的下周计划，生成卡片由用户确认。",
+        {"trigger": _TRIG, "method": _METHOD}, ["trigger", "method"]),
+    _fn("offer_reminder", "建议若干分钟后提醒用户一件事（如饭后、下班前做某个动作），生成卡片由用户确认。",
+        {"minutes": {"type": "integer", "minimum": 5, "maximum": 720},
+         "note": {"type": "string", "description": "提醒内容，20 字以内"}}, ["minutes", "note"]),
+    _fn("offer_log", "用户说自己刚抽了烟时，生成「记下这一根」卡片，由用户确认后记录。", {"trigger": _TRIG}),
+]
+AGENT_TOOL_NAMES = {t["function"]["name"] for t in AGENT_TOOLS}
+AGENT_RULES = (
+    "\n你现在是能调用工具的戒烟助手（Agent）。工作方式：\n"
+    "- 先判断用户需要什么。需要了解情况时调用 get_progress、find_patterns，不要凭空猜数字。\n"
+    "- 用户此刻想抽：先 recommend_methods，再用 offer_sos 给出排第一的办法（场景不明确时可以不填场景）。\n"
+    "- 用户说抽了：不批评，用 offer_log 让他记下，再结合 find_patterns 说一句下次怎么提前准备。\n"
+    "- 同一个场景反复失守时，可以用 offer_plan 建议固定应对；用户提到之后某个时间点时可以用 offer_reminder。\n"
+    "- 工具结果是用户的真实记录，引用数字要准确；没有记录就如实说还没有数据。\n"
+    "- 一次回复最多给 2 张卡片。最终回复 2–4 句，口语化，不要提工具名称、id 或「卡片」以外的技术词。\n"
+    "- 闲聊或简单问题直接回答，不必调用工具。\n"
+    "- 不要让用户自己去点「想抽了」或让他报数据：需要数据就调工具查，需要行动就直接给卡片。"
+)
 
 # 计数只在内存里：实例重启会清零，对演示足够；要更严格可换成云数据库
 _lock = Lock()
@@ -107,6 +155,83 @@ def clean_messages(raw):
     return msgs if msgs and msgs[-1]["role"] == "user" else []
 
 
+def clean_agent_messages(raw):
+    """Agent 对话：允许 assistant 的工具调用和 tool 结果，但结构必须对得上，否则整体拒绝"""
+    msgs, pending = [], set()
+    for m in (raw if isinstance(raw, list) else [])[-24:]:
+        if not isinstance(m, dict):
+            return []
+        role = m.get("role")
+        if role == "user":
+            text = str(m.get("content") or "").strip()[:MAX_MSG_CHARS]
+            if text:
+                msgs.append({"role": "user", "content": text})
+            pending = set()
+        elif role == "assistant":
+            out = {"role": "assistant", "content": str(m.get("content") or "")[:600]}
+            calls = []
+            for c in (m.get("tool_calls") or [])[:4]:
+                fn = c.get("function") if isinstance(c, dict) else None
+                if not isinstance(fn, dict) or fn.get("name") not in AGENT_TOOL_NAMES:
+                    return []
+                cid = str(c.get("id") or "")[:64]
+                args = fn.get("arguments")
+                args = args if isinstance(args, str) else json.dumps(args or {}, ensure_ascii=False)
+                calls.append({"id": cid, "type": "function", "function": {"name": fn["name"], "arguments": args[:500]}})
+                pending.add(cid)
+            if calls:
+                out["tool_calls"] = calls
+            elif not out["content"].strip():
+                continue
+            msgs.append(out)
+        elif role == "tool":
+            cid = str(m.get("tool_call_id") or "")[:64]
+            if cid not in pending:
+                return []
+            pending.discard(cid)
+            msgs.append({"role": "tool", "tool_call_id": cid, "content": str(m.get("content") or "")[:2000]})
+        else:
+            return []
+    while msgs and msgs[0]["role"] != "user":
+        msgs.pop(0)
+    if not msgs or pending:
+        return []
+    last_user = max(i for i, m in enumerate(msgs) if m["role"] == "user")
+    steps = sum(1 for m in msgs[last_user:] if m.get("tool_calls"))
+    if steps > AGENT_MAX_STEPS or msgs[-1]["role"] == "assistant":
+        return []
+    return msgs
+
+
+def agent_step(messages):
+    """非流式调用一次模型，返回 (清理后的 assistant 消息, 模型名)"""
+    last = None
+    for model in AGENT_MODELS:
+        body = {"model": model, "stream": False, "max_tokens": 600, "temperature": 0.4,
+                "thinking": {"type": "disabled"}, "messages": messages,
+                "tools": AGENT_TOOLS, "tool_choice": "auto"}
+        req = urllib.request.Request(ZHIPU_URL, data=json.dumps(body, ensure_ascii=False).encode(), method="POST", headers={
+            "Authorization": "Bearer " + API_KEY, "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                msg = json.loads(r.read().decode())["choices"][0]["message"]
+            calls = [{"id": c.get("id") or f"call_{i}", "type": "function",
+                      "function": {"name": c["function"]["name"], "arguments": c["function"].get("arguments") or "{}"}}
+                     for i, c in enumerate(msg.get("tool_calls") or [])
+                     if c.get("function", {}).get("name") in AGENT_TOOL_NAMES][:4]
+            out = {"role": "assistant", "content": (msg.get("content") or "").strip()}
+            if calls:
+                out["tool_calls"] = calls
+            return out, model
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code == 401:  # Key 不对，换模型也没用
+                break
+        except (OSError, ValueError, KeyError, IndexError, TypeError) as e:
+            last = e
+    raise last
+
+
 def open_upstream(messages):
     """依次尝试 MODELS，返回 (响应流, 模型名)；全部失败时抛出最后一个错误"""
     last = None
@@ -161,18 +286,31 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(500, {"error": "服务端没有配置 ZHIPU_API_KEY"})
         try:
             size = int(self.headers.get("Content-Length") or 0)
-            if size > 20000:
+            if size > 40000:
                 return self._json(413, {"error": "消息太长了"})
             payload = json.loads(self.rfile.read(size) or b"{}")
         except (ValueError, json.JSONDecodeError):
             return self._json(400, {"error": "请求格式不对"})
-        messages = clean_messages(payload.get("messages"))
+        agent = payload.get("agent") is True
+        messages = (clean_agent_messages if agent else clean_messages)(payload.get("messages"))
         if not messages:
             return self._json(400, {"error": "没有可发送的消息"})
         ip = (self.headers.get("X-Forwarded-For") or self.client_address[0]).split(",")[0].strip()
-        ok, why = take_quota(ip)
-        if not ok:
-            return self._json(429, {"error": why})
+        # 只有用户新发一条消息才扣额度；同一条消息里的工具往返不重复计算
+        if messages[-1]["role"] == "user":
+            ok, why = take_quota(ip)
+            if not ok:
+                return self._json(429, {"error": why})
+        if agent:
+            system = {"role": "system", "content": system_prompt(payload.get("profile")) + AGENT_RULES}
+            try:
+                message, model = agent_step([system] + messages)
+            except urllib.error.HTTPError as e:
+                hint = "，请检查 ZHIPU_API_KEY" if e.code == 401 else ""
+                return self._json(502, {"error": f"AI 服务暂时不可用（{e.code}{hint}）"})
+            except Exception as e:
+                return self._json(502, {"error": f"连不上 AI 服务（{type(e).__name__}）"})
+            return self._json(200, {"message": message, "model": model})
         try:
             upstream, model = open_upstream([{"role": "system", "content": system_prompt(payload.get("profile"))}] + messages)
         except urllib.error.HTTPError as e:

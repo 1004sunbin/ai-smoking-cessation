@@ -4,14 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>每一根</title>
-<meta name="description" content="戒烟陪伴：烟瘾急救 + 复吸后继续陪伴。每一根都记下来，但一次复吸不让你从零开始。">
+<meta name="description" content="戒烟助手：烟瘾急救、复吸后继续陪伴，以及会查看你的记录、给出下一步的 AI 助手。">
+<meta name="theme-color" content="#f6f4ef">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="app" id="appView">
   <header class="top">
     <div>
-      <div class="brand">每一根 · 戒烟陪伴</div>
+      <div class="brand">每一根</div>
       <div class="date" id="todayLabel"></div>
     </div>
     <button class="iconbtn" id="openSettings" aria-label="设置与隐私">
@@ -32,27 +33,34 @@
     <div class="card hero">
       <div class="label">这一段无烟时长</div>
       <div class="clock" id="clock">0<small>天</small> 00:00:00</div>
-      <div class="hint" id="heroSub"></div>
+      <div class="next">
+        <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle class="ring-fg" id="ring" cx="18" cy="18" r="15.5"/></svg>
+        <div><b id="nextLabel"></b><small id="nextSub"></small></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="v" id="sAvoided">0<small>根</small></div><div class="k">少抽</div></div>
+        <div class="stat"><div class="v" id="sMoney">¥0</div><div class="k">省下</div></div>
+        <div class="stat"><div class="v" id="sLife">0<small>分钟</small></div><div class="k">寿命</div></div>
+        <div class="stat"><div class="v" id="sTar">0<small>mg</small></div><div class="k">少吸焦油</div></div>
+      </div>
+      <details class="est"><summary>这些数字怎么算的</summary><p id="estNote"></p></details>
     </div>
 
-    <div class="grid2">
-      <div class="stat"><div class="k"><span class="dot" style="background:var(--green)"></span>少抽的烟 · 估算</div><div class="v" id="sAvoided">0<small>根</small></div></div>
-      <div class="stat"><div class="k"><span class="dot" style="background:var(--orange)"></span>省下的钱 · 估算</div><div class="v" id="sMoney">¥0</div></div>
-      <div class="stat"><div class="k"><span class="dot" style="background:var(--blue)"></span>预期寿命 · 统计估算</div><div class="v" id="sLife">0<small>分钟</small></div></div>
-      <div class="stat"><div class="k"><span class="dot" style="background:var(--purple)"></span>少吸入焦油 · 估算</div><div class="v" id="sTar">0<small>mg</small></div></div>
-    </div>
-    <p class="foot" style="margin:-6px 4px 14px" id="estNote"></p>
+    <button class="ask-pill" id="askPill">
+      <span class="ask-dot"></span><span class="ask-txt">跟助手说说现在的情况…</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
 
     <div class="card">
       <h3>此刻，你选择了什么？</h3>
-      <p class="hint">一键记录。记错了可以撤销，忘了可以补记。</p>
+      <p class="hint">记错了可以撤销，忘了可以补记。</p>
       <div class="row" style="margin-top:14px">
-        <button class="btn green" id="btnResist">✋ 忍住了</button>
+        <button class="btn primary" id="btnResist">忍住了</button>
         <button class="btn ghost" id="btnSmoke">抽了一根</button>
       </div>
       <div class="daybar" id="dayBar"></div>
       <div class="log" id="todayLog"></div>
-      <button class="link" id="btnBackfill">＋ 补记更早的记录</button>
+      <div class="log-acts"><button class="link" id="logMore" hidden></button><button class="link" id="btnBackfill">＋ 补记</button></div>
     </div>
 
     <div class="card">
@@ -60,10 +68,8 @@
       <div id="planBody"></div>
     </div>
 
-    <div class="card" id="checkinCard">
-      <h3>每日打卡</h3>
-      <p class="hint" id="checkinHint">花 10 秒记录今天的状态</p>
-      <div style="margin-top:12px" id="checkinBody"></div>
+    <div class="card checkin" id="checkinCard">
+      <div id="checkinBody"></div>
     </div>
   </section>
 
@@ -98,7 +104,7 @@
         <div class="meter"><div class="k">焦油</div><div class="v" id="mTar">0<small>mg</small></div></div>
         <div class="meter"><div class="k">尼古丁</div><div class="v" id="mNic">0<small>mg</small></div></div>
         <div class="meter"><div class="k">一氧化碳</div><div class="v" id="mCo">0<small>mg</small></div></div>
-        <div class="meter"><div class="k">寿命</div><div class="v" id="mLife" style="color:var(--red)">-0<small>分钟</small></div></div>
+        <div class="meter"><div class="k">寿命</div><div class="v bad" id="mLife">-0<small>分钟</small></div></div>
         <div class="meter"><div class="k">化学物质</div><div class="v" id="mChem">0<small>种</small></div></div>
         <div class="meter"><div class="k">花费</div><div class="v" id="mCost">¥0</div></div>
       </div>
@@ -118,11 +124,11 @@
       </div>
 
       <div class="result" id="result">
-        <h4>如果，你放下这一根 🌱</h4>
+        <h4>如果，你放下这一根</h4>
         <p class="hint" style="margin:0">同样一根烟的时间，你的身体可以换来：</p>
         <div class="gainlist" id="gainList"></div>
         <div class="row">
-          <button class="btn green small" id="putDown">我放下了这一根</button>
+          <button class="btn primary small" id="putDown">我放下了这一根</button>
           <button class="btn ghost small" id="relight">重新演示</button>
         </div>
       </div>
@@ -131,7 +137,7 @@
 
     <div class="eyebrow">少抽一根计算器</div>
     <div class="card">
-      <h3>每天少抽 <span id="lessN" style="color:var(--blue)">1</span> 根，一年后</h3>
+      <h3>每天少抽 <span id="lessN">1</span> 根，一年后</h3>
       <input type="range" min="1" max="20" value="1" id="lessRange" aria-label="每天少抽几根">
       <div class="calc-out">
         <div><b id="cLife">2.8 天</b><span>夺回的寿命</span></div>
@@ -143,27 +149,31 @@
     <p class="foot">数据来源与说明：每根烟约减少 11 分钟预期寿命为群体统计估算（Shaw 等，BMJ 2000）；烟草烟雾含 7000+ 种化学物质、至少 70 种致癌物（美国 CDC / NCI）；尼古丁约 10 秒抵达大脑（NIDA）。包装上的焦油、尼古丁、一氧化碳为机器测量值，实际吸入量因抽吸方式常更高。以上用于健康科普，不构成医疗诊断。</p>
   </section>
 
-  <!-- ============ 恢复 ============ -->
-  <section class="tab" id="tab-heal">
-    <h1 class="large">身体恢复</h1>
-    <p class="lead" id="healLead">从最后一根烟开始计时，身体每一刻都在变好。</p>
-    <div class="card" id="timeline"></div>
-    <div class="eyebrow">里程碑</div>
-    <div class="card"><div class="badges" id="badges"></div></div>
-    <p class="foot">恢复时间线参考 WHO 与美国 CDC 公开资料，是人群层面的平均趋势，个体差异很大，不代表你个人的医学结果。</p>
+  <!-- ============ 助手 ============ -->
+  <section class="tab" id="tab-agent">
+    <h1 class="large">助手</h1>
+    <p class="lead">说说现在的情况。我会看你的记录、挑一个办法，或者帮你定个计划。</p>
+    <div class="chat" id="chat" aria-live="polite"></div>
+    <div class="composer-wrap">
+      <div class="quick" id="quick"></div>
+      <form class="composer" id="composer">
+        <input id="chatInput" placeholder="比如：开会前很想抽" autocomplete="off" enterkeyhint="send">
+        <button type="submit" aria-label="发送">↑</button>
+      </form>
+      <p class="chat-hint" id="chatHint"></p>
+    </div>
   </section>
 
-  <!-- ============ 陪伴 ============ -->
-  <section class="tab" id="tab-buddy">
-    <h1 class="large">陪伴</h1>
+  <!-- ============ 进展 ============ -->
+  <section class="tab" id="tab-progress">
+    <h1 class="large">进展</h1>
     <p class="lead">看清自己的规律，找到对你真正有用的办法。</p>
 
-    <div class="eyebrow" style="margin-top:4px">最近 7 天</div>
     <div class="card">
-      <div class="card-head"><h3>每日吸烟量</h3><span class="legend" id="weekLegend"></span></div>
+      <div class="card-head"><h3>最近 7 天</h3><span class="legend" id="weekLegend"></span></div>
       <div class="week" id="week"></div>
       <div class="kpis kpis4" id="kpis"></div>
-      <p class="foot" id="weekNote" style="margin:10px 0 0"></p>
+      <p class="foot" id="weekNote" style="margin:12px 0 0"></p>
     </div>
 
     <div class="card nextweek">
@@ -174,20 +184,15 @@
     <div class="eyebrow">对你有效的方法</div>
     <div class="card"><div id="methodBars"></div></div>
 
-    <div class="eyebrow">想抽 / 抽烟的场景</div>
+    <div class="eyebrow">想抽与抽烟的场景</div>
     <div class="card"><div id="triggerBars"></div></div>
 
-    <div class="eyebrow">聊聊</div>
-    <div class="card">
-      <h3>戒烟伙伴</h3>
-      <p class="hint" id="chatHint">本地规则回复 · 对话不会发送到任何服务器 · 不做诊断</p>
-      <div class="chat" id="chat"></div>
-      <div class="quick" id="quick"></div>
-      <form class="composer" id="composer">
-        <input id="chatInput" placeholder="说说现在的感受…" autocomplete="off">
-        <button type="submit" aria-label="发送">↑</button>
-      </form>
-    </div>
+    <div class="eyebrow">身体恢复</div>
+    <p class="lead" id="healLead" style="margin:-2px 2px 12px;font-size:14px">从最后一根烟开始计时，身体每一刻都在变好。</p>
+    <div class="card" id="timeline"></div>
+    <div class="eyebrow">里程碑</div>
+    <div class="card"><div class="badges" id="badges"></div></div>
+    <p class="foot">恢复时间线参考 WHO 与美国 CDC 公开资料，是人群层面的平均趋势，个体差异很大，不代表你个人的医学结果。</p>
   </section>
 </div>
 
@@ -196,9 +201,9 @@
   <nav class="about-nav"><a href="#" id="aboutBack">← 打开应用</a><span>作品集 · 产品设计与前端实现</span></nav>
 
   <header class="about-hero">
-    <p class="kicker">每一根 · 戒烟陪伴 Web 应用</p>
+    <p class="kicker">每一根 · 戒烟助手 Web 应用</p>
     <h1>每一根都记下来，<br>但一次复吸不让你从零开始。</h1>
-    <p class="about-lead">戒烟最难的是两个时刻：烟瘾冲上来的那几分钟，和抽了之后觉得"前功尽弃"的那一刻。这个项目围绕这两个时刻设计：烟瘾急救，以及复吸后继续陪伴。</p>
+    <p class="about-lead">戒烟最难的是两个时刻：烟瘾冲上来的那几分钟，和抽了之后觉得"前功尽弃"的那一刻。这个项目围绕这两个时刻设计：烟瘾急救、复吸后继续陪伴，以及一个会查看记录、替你准备下一步的 AI 助手。</p>
     <div class="about-cta"><a class="btn primary" href="#">打开应用</a><span class="hint">无需注册，数据只存在你的设备上；想先看效果，可在设置里载入示例数据</span></div>
   </header>
 
@@ -235,7 +240,20 @@
       <li><b>烟瘾急救</b><span>选场景和渴求强度 → 推荐一个动作并计时 → 结果（挺过去 / 还是抽了）→ 评价方法是否有效。</span></li>
       <li><b>复吸后的下一步</b><span>不评判；展示仍然有效的累计进度，并针对这次的诱因给出下次可以提前做的事。</span></li>
       <li><b>每周回顾</b><span>7 日趋势、与基线和目标对比、最有效的方法，以及"下周试试这一件事"。</span></li>
+      <li><b>找助手</b><span>直接说"开会前很想抽"或"我又抽了"，助手查看记录、挑办法，给出可以一键执行的急救、计划、提醒卡片。</span></li>
     </ol>
+  </section>
+
+  <section class="about-sec">
+    <h2>AI 助手：从"会聊天"到"会做事"</h2>
+    <p>早期的 AI 陪伴只会回一段话。改成 Agent 后，模型可以调用 7 个工具，自己决定先看什么、再做什么：</p>
+    <div class="tech">
+      <div><b>查看</b><span>进度（今天抽了几根、累计少抽）；规律（高发场景、高发时段、急救成功率、哪些办法被评为有帮助）。</span></div>
+      <div><b>挑选</b><span>按场景和渴求强度，复用急救推荐算法，从 11 个动作里挑出最适合这个人的 3 个。</span></div>
+      <div><b>准备</b><span>急救、下周计划、定时提醒、记下这一根。只生成卡片，用户点了才执行，助手不会替人做决定。</span></div>
+    </div>
+    <p>一条消息最多 4 轮工具调用、最多 2 张卡片。危机、急症和用药话题在调用任何工具之前就被浏览器拦下，使用固定回复。AI 连不上时，同一套工具按本地规则执行，助手依然可用。</p>
+    <div class="callout"><b>为什么不用数据库</b>上一版曾在云函数里放 SQLite 保存用户画像。但云函数的本地磁盘随实例回收，数据会悄悄丢失，还和浏览器里的记录对不上。最后改为：记录只存在用户浏览器里，工具也在浏览器里执行，发给 AI 的只有统计结果。服务端只做转发，不保存任何内容。等到需要账号和跨设备同步时，再接托管数据库。</div>
   </section>
 
   <section class="about-sec">
@@ -251,21 +269,21 @@
     <h2>隐私设计</h2>
     <ul>
       <li>所有记录、打卡和急救评价只保存在用户浏览器的 localStorage 中，不上传。</li>
-      <li>陪伴对话默认由 AI 生成，聊天框下方写明消息会发送给谁；在设置中可一键关闭，改用本地规则回复。只发送聊天内容和几项统计数字，不发送原始记录。</li>
+      <li>助手默认由 AI 驱动，输入框下方写明由谁驱动；在设置中可一键关闭，改用本地规则。工具在浏览器里执行，只发送对话和工具算出的统计结果，不发送原始记录。</li>
       <li>涉及危机、急症和用药的话题始终在浏览器端使用固定回复，并给出 12356、120、12320 等求助渠道，不会发给 AI。</li>
       <li>设置中可以一键清除全部数据；演示数据单独标注，可随时重置或退出。</li>
     </ul>
-    <div class="callout"><b>一次取舍</b>开发中曾尝试在前端直接接入云端大模型（Claude、硅基流动、Gemini）。纯静态页面调用这些服务必须把 API 密钥放在浏览器里，任何访客都能拿到，所以先撤掉了云端 AI。最终方案是加一个云函数转发：密钥只存在服务端；只接受本站调用；每位访客每天限 20 条；系统提示词在服务端拼，浏览器只能传聊天内容和几项统计数字，接口不能被拿去当通用聊天机器人；服务端不记录聊天内容。</div>
+    <div class="callout"><b>一次取舍</b>开发中曾尝试在前端直接接入云端大模型（Claude、硅基流动、Gemini）。纯静态页面调用这些服务必须把 API 密钥放在浏览器里，任何访客都能拿到，所以先撤掉了云端 AI。最终方案是加一个云函数转发：密钥只存在服务端；只接受本站调用；每位访客每天限 20 条；系统提示词和工具清单都在服务端固定，浏览器只能传对话、工具结果和几项统计数字，接口不能被拿去当通用聊天机器人；服务端不记录任何内容。</div>
   </section>
 
   <section class="about-sec">
     <h2>技术方案</h2>
     <div class="tech">
       <div><b>前端</b><span>原生 HTML / CSS / JavaScript，无框架、无第三方依赖，托管在 GitHub Pages。</span></div>
-      <div><b>AI 陪伴</b><span>阿里云函数计算（Python 标准库）转发到智谱 GLM 免费模型，流式返回；主模型限流时自动切换备用模型，失败时退回本地规则回复。</span></div>
-      <div><b>数据</b><span>localStorage 单一状态对象；事件流（抽烟 / 忍住）带 id，支持撤销和补记；旧版数据自动迁移。</span></div>
+      <div><b>AI 助手</b><span>阿里云函数计算（Python 标准库）转发到智谱 GLM 免费模型，使用函数调用（tool calls）；浏览器执行工具并把结果回传，最多 4 轮。主模型限流时切换备用模型，失败时退回本地规则。</span></div>
+      <div><b>数据</b><span>localStorage 单一状态对象，无服务器数据库；事件流（抽烟 / 忍住）带 id，支持撤销和补记；旧版数据自动迁移。</span></div>
       <div><b>统计口径</b><span>"少抽的烟"= 基线 × 天数 − 实际记录，首页累计和周报共用同一个函数，避免数字互相对不上。</span></div>
-      <div><b>界面</b><span>移动端优先，深浅色模式，尊重"减少动态效果"系统设置。</span></div>
+      <div><b>界面</b><span>移动端优先；暖白底、细线分隔、衬线数字，单一墨绿主色；深浅色模式，尊重"减少动态效果"系统设置。</span></div>
     </div>
   </section>
 
@@ -277,6 +295,7 @@
       <li><b>云端 AI 尝试与回退</b><span>前端直连大模型有密钥暴露风险，先回退为本地规则（见隐私设计）。</span></li>
       <li><b>v2 重构</b><span>把重心从"展示危害"转向"急救 + 复吸后陪伴"：急救按场景与强度推荐并收集效果反馈；复吸不清零累计进度；记录支持撤销和补记；修正减量目标和周报口径；加入可重置的示例数据（在设置中载入）。</span></li>
       <li><b>AI 陪伴上线</b><span>加入云函数转发、限流和安全话题本地拦截。最初需要访客点击同意才开启，试用中觉得多了一步阻碍，改为默认开启、在聊天框下方说明并可在设置中关闭；测试中发现"胸口有点痛"这类说法没被识别为急症，扩充了识别规则，并在 AI 提示词里加了第二道保险。</span></li>
+      <li><b>v3 Agent 与界面重做</b><span>陪伴升级为能调用工具的助手：查看记录、挑办法、准备急救 / 计划 / 提醒卡片，由用户确认执行。撤掉了服务端 SQLite，数据和工具都留在浏览器。界面改为更克制的编辑风格，导航调整为今天、助手、进展、一根烟，"今天的预案"会在高发时段前主动提醒。</span></li>
     </ol>
   </section>
 
@@ -292,14 +311,14 @@
   <footer class="about-foot">本应用提供行为支持与健康科普，不提供诊断或用药建议。中国戒烟咨询可拨打 12320 卫生热线。</footer>
 </main>
 
-<button class="sos" id="sosBtn">🫁 想抽了</button>
+<button class="sos" id="sosBtn">想抽了</button>
 
 <nav class="tabbar" id="tabbar">
   <div class="in">
-    <button class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>今天</button>
-    <button data-tab="cig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="13" width="17" height="4" rx="1"/><path d="M15 13v4M21 13v4M18 9c0-2 3-2 3-4"/></svg>一根烟</button>
-    <button data-tab="heal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg>恢复</button>
-    <button data-tab="buddy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>陪伴</button>
+    <button class="on" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>今天</button>
+    <button data-tab="agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>助手</button>
+    <button data-tab="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>进展</button>
+    <button data-tab="cig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="13" width="17" height="4" rx="1"/><path d="M15 13v4M21 13v4M18 9c0-2 3-2 3-4"/></svg>一根烟</button>
   </div>
 </nav>
 
@@ -309,12 +328,12 @@
 <div class="sheet" id="welcome">
   <div class="grab"></div>
   <div id="wIntro">
-    <h2>每一根</h2>
+    <div class="welcome-mark">每一根</div>
     <p class="sub">每一根都记下来，但一次复吸不让你从零开始。</p>
     <ul class="wlist">
       <li><b>烟瘾急救</b>按场景和强度给你一个马上能做的动作，并记住哪些对你有用。</li>
-      <li><b>复吸后继续陪伴</b>抽了也不清零，帮你复盘诱因、准备下一次。</li>
-      <li><b>只存在你的设备上</b>不注册、不上传，随时可以清除。</li>
+      <li><b>会做事的助手</b>它会查看你的记录、找出规律，替你准备急救、计划和提醒，由你点头再执行。</li>
+      <li><b>记录只存在你的设备上</b>不注册、不需要数据库，随时可以清除。</li>
     </ul>
     <button class="btn primary" id="wSelf">开始使用</button>
     <a class="link center" href="#about" id="wAbout">了解这个项目 →</a>
@@ -329,7 +348,7 @@
       <div class="field"><label for="oPrice">每包价格（¥）</label><input id="oPrice" type="number" min="1" value="25" inputmode="decimal"></div>
     </div>
     <div class="field"><label for="oName">怎么称呼你（可选）</label><input id="oName" placeholder="例如：小林" maxlength="12"></div>
-    <div class="toggle"><span>用我的记录个性化推荐急救方法</span><label class="switch"><input type="checkbox" id="oConsent" checked><i></i></label></div>
+    <div class="toggle"><span>根据我的记录推荐急救方法</span><label class="switch"><input type="checkbox" id="oConsent" checked><i></i></label></div>
     <div class="disclaimer">本应用提供行为支持与健康科普，不提供诊断、用药建议或戒断效果承诺。如有胸痛、呼吸困难等症状，请立即就医。</div>
     <button class="btn primary" style="margin-top:16px" id="oStart">从现在开始</button>
     <button class="link center" id="oBack">← 返回</button>
@@ -363,7 +382,7 @@
 <div class="sheet" id="sos">
   <div class="grab"></div>
   <div id="sosAsk">
-    <h2>先停 10 秒</h2>
+    <h2>先停十秒</h2>
     <p class="sub">告诉我现在的情况，我给你一个马上能做的办法。</p>
     <div class="field"><label>是什么让你想抽？</label><div class="chips" id="sosTrig"></div></div>
     <div class="field"><label>有多想抽？</label><div class="seg" id="sosLv"></div><div class="seg-cap"><span>有一点</span><span>非常想</span></div></div>
@@ -379,7 +398,7 @@
     <p class="hint sub" style="text-align:center;margin-top:8px">渴求通常在几分钟内到达高峰，然后减弱。</p>
     <button class="link center" id="sosSwap">换一个办法</button>
     <div class="row" style="margin-top:6px">
-      <button class="btn green" id="sosWin">挺过去了</button>
+      <button class="btn primary" id="sosWin">挺过去了</button>
       <button class="btn ghost" id="sosLose">还是抽了</button>
     </div>
   </div>
@@ -400,14 +419,14 @@
   <div class="group-label">外观</div>
   <div class="seg" id="themeSeg"><button data-v="auto">跟随系统</button><button data-v="light">浅色</button><button data-v="dark">深色</button></div>
 
-  <div class="group-label">陪伴</div>
+  <div class="group-label">助手</div>
   <div class="group">
     <label class="row-item" for="sConsent">
       <span class="ri-text"><b>个性化推荐</b><small>根据你的急救评价，优先推荐对你有效的方法</small></span>
       <span class="switch"><input type="checkbox" id="sConsent"><i></i></span>
     </label>
     <label class="row-item" for="sAi" id="sAiRow" hidden>
-      <span class="ri-text"><b>AI 陪伴回复 <em class="tag" id="sAiTag">仅本机</em></b><small id="sAiSub"></small></span>
+      <span class="ri-text"><b>AI 助手 <em class="tag" id="sAiTag">仅本机</em></b><small id="sAiSub"></small></span>
       <span class="switch"><input type="checkbox" id="sAi"><i></i></span>
     </label>
   </div>
@@ -421,7 +440,7 @@
     <details class="pc-more">
       <summary>具体说明</summary>
       <ul>
-        <li>记录、打卡、急救评价和对话保存在这台设备的浏览器里（localStorage），不需要注册。</li>
+        <li>记录、打卡、急救评价和对话保存在这台设备的浏览器里（localStorage），不需要注册，也没有服务器数据库。</li>
         <li id="pAiLine"></li>
         <li>换浏览器、清除浏览器数据或使用无痕模式时，记录会丢失。</li>
         <li>涉及危机、急症和用药的话题，始终使用固定的安全回复，并给出求助电话。</li>
@@ -450,7 +469,7 @@
 
 <div class="toast" id="toast" role="status"></div>
 
-<!-- 本机私有配置（含 AI Key，已被 .gitignore 忽略）；线上没有这个文件，会自动使用本地规则回复 -->
+<!-- 本机私有配置（含 AI Key，已被 .gitignore 忽略）；线上没有这个文件，会走 ai-config.js 里的转发服务 -->
 <script src="js/ai-config.js"></script>
 <script src="js/config.local.js" onerror="this.remove()"></script>
 <script src="js/app.js"></script>

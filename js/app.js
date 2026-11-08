@@ -123,16 +123,16 @@ const STRATEGY = {
 };
 // WHO / CDC quit timeline
 const MILES = [
-  {t:20*MIN, ic:'❤️', label:'20 分钟', d:'心率和血压开始回落'},
-  {t:12*HOUR, ic:'🩸', label:'12 小时', d:'血液中一氧化碳水平降至正常'},
-  {t:2*DAY,  ic:'👃', label:'48 小时', d:'嗅觉和味觉开始改善'},
-  {t:3*DAY,  ic:'🫁', label:'72 小时', d:'支气管放松，呼吸变得轻松'},
-  {t:14*DAY, ic:'🏃', label:'2 – 12 周', d:'血液循环改善，肺功能提升'},
-  {t:30*DAY, ic:'🌬️', label:'1 – 9 个月', d:'咳嗽和气短减少'},
-  {t:365*DAY,ic:'💪', label:'1 年', d:'冠心病风险约降至吸烟者的一半'},
-  {t:5*365*DAY, ic:'🧠', label:'5 年', d:'中风风险逐步接近不吸烟者'},
-  {t:10*365*DAY, ic:'🎗️', label:'10 年', d:'肺癌死亡风险约为吸烟者的一半'},
-  {t:15*365*DAY, ic:'🌳', label:'15 年', d:'冠心病风险接近从不吸烟者'}
+  {t:20*MIN, label:'20 分钟', d:'心率和血压开始回落'},
+  {t:12*HOUR, label:'12 小时', d:'血液中一氧化碳水平降至正常'},
+  {t:2*DAY,  label:'48 小时', d:'嗅觉和味觉开始改善'},
+  {t:3*DAY,  label:'72 小时', d:'支气管放松，呼吸变得轻松'},
+  {t:14*DAY, label:'2 – 12 周', d:'血液循环改善，肺功能提升'},
+  {t:30*DAY, label:'1 – 9 个月', d:'咳嗽和气短减少'},
+  {t:365*DAY, label:'1 年', d:'冠心病风险约降至吸烟者的一半'},
+  {t:5*365*DAY, label:'5 年', d:'中风风险逐步接近不吸烟者'},
+  {t:10*365*DAY, label:'10 年', d:'肺癌死亡风险约为吸烟者的一半'},
+  {t:15*365*DAY, label:'15 年', d:'冠心病风险接近从不吸烟者'}
 ];
 
 // 烟瘾急救方法库：fit = 适合的场景（'*' 为通用），lv = 适合的渴求强度区间，sec = 建议时长（秒）
@@ -154,7 +154,7 @@ const RATING = {good:'有帮助', ok:'一般', bad:'没帮助'};
 /* ---------- state ---------- */
 let S = load();
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
-function blank(){return {v:2,setup:false,demo:false,name:'',mode:'quit',base:15,price:25,brand:'万宝路(红)',why:[],consent:true,start:Date.now(),events:[],sos:[],plan:null,checkins:{},chat:[],theme:'auto',aiOn:false,aiAsked:false}}
+function blank(){return {v:2,setup:false,demo:false,name:'',mode:'quit',base:15,price:25,brand:'万宝路(红)',why:[],consent:true,start:Date.now(),events:[],sos:[],plan:null,checkins:{},chat:[],reminders:[],theme:'auto',aiOn:false,aiAsked:false}}
 function load(){
   let r=null;
   try{r=JSON.parse(localStorage.getItem(KEY))}catch(e){}
@@ -162,7 +162,7 @@ function load(){
   const s=Object.assign(blank(),r);
   // 旧版数据迁移：事件补 id，去掉不准确的"采纳计数"
   s.events=s.events.map(e=>e.id?e:Object.assign({id:uid()},e));
-  s.sos=s.sos||[];
+  s.sos=s.sos||[]; s.reminders=s.reminders||[];
   s.chat=(s.chat||[]).filter(m=>!m.typing);
   delete s.adopted; delete s.suggested; delete s.customKey;
   return s;
@@ -247,8 +247,9 @@ function goTab(name){
   $$('nav.tabbar button').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));
   $$('.tab').forEach(t=>t.classList.toggle('active',t.id==='tab-'+name));
   window.scrollTo({top:0});
-  if(name==='heal') renderHeal();
-  if(name==='buddy') renderBuddy();
+  document.body.classList.toggle('on-agent',name==='agent');
+  if(name==='progress'){renderBuddy();renderHeal()}
+  if(name==='agent') renderChat();
 }
 $$('nav.tabbar button').forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
 
@@ -267,6 +268,15 @@ function hide(force){
 }
 $('#scrim').onclick=hide;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')hide()});
+// 弹层在顶部时向下拖动可以关闭，和系统弹层的手感一致
+$$('.sheet').forEach(sh=>{
+  let y0=null,dy=0;
+  sh.addEventListener('touchstart',e=>{y0=sh.scrollTop<=0?e.touches[0].clientY:null;dy=0},{passive:true});
+  sh.addEventListener('touchmove',e=>{if(y0===null)return;dy=Math.max(0,e.touches[0].clientY-y0);sh.style.transition='none';sh.style.transform=dy?`translateY(${dy}px)`:''},{passive:true});
+  sh.addEventListener('touchend',()=>{if(y0===null)return;sh.style.transition='';sh.style.transform='';if(dy>90)hide();y0=null});
+});
+// 关键操作的轻微震动反馈（只在支持的手机上生效）
+function buzz(){try{navigator.vibrate&&navigator.vibrate(10)}catch(e){}}
 
 function chipGroup(el,list,multi){
   el.innerHTML=list.map(v=>`<button class="chip" data-v="${esc(v)}">${esc(v)}</button>`).join('');
@@ -299,12 +309,19 @@ $('#oStart').onclick=()=>{
   });
   S.chat=[{r:'ai',x:welcomeMsg()}];
   save(); hide(); setBrand(S.brand); renderAll(); renderChat(); goTab('today');
-  toast('开始了。想抽的时候，点右下角「想抽了」');
+  toast('开始了。想抽的时候，点右下角「想抽了」或找助手');
 };
 
 /* ---------- today ---------- */
 function tick(){
-  $('#clock').innerHTML=fmtDur(Date.now()-lastSmoke());
+  const since=Date.now()-lastSmoke();
+  $('#clock').innerHTML=fmtDur(since);
+  // 下一个恢复节点：进度环从上一个节点走到下一个节点
+  const i=MILES.findIndex(m=>m.t>since), nx=MILES[i], prev=i>0?MILES[i-1].t:0;
+  const pct=nx?(since-prev)/(nx.t-prev):1;
+  $('#ring').style.strokeDashoffset=(97.4*(1-pct)).toFixed(1);
+  $('#nextLabel').textContent=nx?`下一站 · ${nx.label}`:'所有恢复节点都已解锁';
+  $('#nextSub').textContent=nx?`${nx.d}，还差 ${fmtLife((nx.t-since)/MIN).join(' ')}`:'了不起，继续保持';
   const a=avoided();
   $('#sAvoided').innerHTML=`${Math.floor(a)}<small>根</small>`;
   $('#sMoney').textContent='¥'+(a*perCig()).toFixed(a*perCig()<100?1:0);
@@ -317,14 +334,18 @@ function renderToday(){
   $('#greet').textContent=`${hi}${S.name?'，'+S.name:''}`;
   const d=new Date();
   $('#todayLabel').textContent=`${d.getMonth()+1}月${d.getDate()}日 · 第 ${dayNo()} 天 · ${S.mode==='quit'?'戒烟':'减量'}`;
-  $('#heroSub').textContent=`已经坚持到第 ${dayNo()} 天，累计忍住 ${resists().length} 次。抽了一根，只会重置这个计时，累计进度不变。`;
+  $('#greetSub').textContent=`第 ${dayNo()} 天，累计忍住 ${resists().length} 次。抽了一根只重置计时，累计进度不变。`;
   $('#estNote').textContent=`估算方式：按你的基线（每天 ${S.base} 根、每包 ¥${S.price}）与实际记录之差计算；寿命按每根约 11 分钟的人群统计值。`;
   const t0=dayStart(Date.now()), today=S.events.filter(e=>e.t>=t0);
   const sc=today.filter(e=>e.type==='smoke').length, rc=today.length-sc;
   const tgt=targetFor(Date.now());
   $('#dayBar').innerHTML=`<span>今天抽了 <b>${sc}</b> 根</span><span>忍住 <b>${rc}</b> 次</span><span>${S.mode==='reduce'?`目标 ≤ <b>${tgt}</b> 根`:'目标 <b>0</b> 根'}</span>`;
   $('#dayBar').classList.toggle('over',sc>tgt);
-  $('#todayLog').innerHTML=today.length?today.slice().reverse().map(e=>`
+  // 默认只显示最近 3 条，避免首页越记越长
+  const shown=logOpen?today.slice().reverse():today.slice(-3).reverse();
+  $('#logMore').hidden=today.length<=3;
+  $('#logMore').textContent=logOpen?'收起':`查看今天全部 ${today.length} 条`;
+  $('#todayLog').innerHTML=today.length?shown.map(e=>`
     <div class="logrow is-${e.type}">
       <span class="tm">${fmtTime(e.t)}</span>
       <span class="what">${e.type==='smoke'?'抽了一根':'忍住了'}${e.trigger?` · ${esc(e.trigger)}`:''}${e.via==='sos'?' · 急救':''}</span>
@@ -332,6 +353,9 @@ function renderToday(){
     </div>`).join(''):'<p class="hint" style="margin-top:10px">今天还没有记录。</p>';
   renderCheckin(); renderPlan(); tick();
 }
+let logOpen=false;
+$('#logMore').onclick=()=>{logOpen=!logOpen;renderToday()};
+$('#askPill').onclick=()=>{goTab('agent');setTimeout(()=>$('#chatInput').focus(),300)};
 $('#todayLog').onclick=e=>{
   const id=e.target.dataset.del; if(!id) return;
   const ev=removeEvent(id); if(!ev) return;
@@ -344,7 +368,7 @@ $('#todayLog').onclick=e=>{
 };
 $('#btnResist').onclick=e=>{
   const ev=addEvent({type:'resist',t:Date.now(),via:'quick'});
-  floatAt(e.currentTarget,`+${LIFE_PER_CIG} 分钟`);
+  buzz();floatAt(e.currentTarget,`+${LIFE_PER_CIG} 分钟`);
   renderAll();
   undoable(ev,`记下了：忍住 1 次（累计 ${resists().length} 次）`);
 };
@@ -398,35 +422,38 @@ function renderPlan(){
   const trig = (S.plan&&S.plan.trigger) || personalTrigger() || fallback;
   const id = S.plan&&S.plan.trigger===trig ? S.plan.method : recommend(trig,3)[0].id;
   const m=METHODS[id];
+  // 主动提醒：接下来两小时内是用户近两周最常抽烟的时段
+  const risk=S.consent&&riskyHours(14)[0], soon=risk&&risk.n>=2&&(risk.h-h+24)%24<=2;
   $('#planSource').textContent = S.plan ? '来自你的周计划' : personalTrigger() ? '基于你的记录' : (S.consent?'记录越多越准':'个性化已关闭');
-  $('#planBody').innerHTML=`<p class="plan-line">如果今天在「<b>${esc(trig)}</b>」时想抽，先做：</p>
+  $('#planBody').innerHTML=(soon?`<p class="plan-alert">${risk.h} 点前后是你最常抽烟的时间（近两周 ${risk.n} 根），可以提前准备。</p>`:'')
+    +`<p class="plan-line">如果今天在「<b>${esc(trig)}</b>」时想抽，先做：</p>
     <div class="tip plan-card"><b>${m.name}</b>${m.desc}</div>
-    <button class="btn ghost small" id="planGo" style="margin-top:10px">现在就用</button>`;
+    <button class="btn ghost small" id="planGo" style="margin-top:12px">现在就用</button>`;
   $('#planGo').onclick=()=>openSOS(trig);
 }
 
 /* ---------- 每日打卡 ---------- */
+// 点两下完成：先选心情，再选渴求强度，选完即保存
+let ciMood=null;
 function renderCheckin(){
   const k=dayKey(Date.now()), c=S.checkins[k];
   if(c){
-    $('#checkinHint').textContent='今天已打卡 ✓';
-    $('#checkinBody').innerHTML=`<div class="kpis" style="margin-top:0"><div><b>${['😣','😕','😐','🙂','😄'][c.mood]}</b><span>心情</span></div><div><b>${c.crave}/5</b><span>渴求强度</span></div><div><b>${streak()}</b><span>连续打卡</span></div></div>`;
+    $('#checkinBody').innerHTML=`<div class="ci-done"><span>今天 · 心情<b>${MOODS[c.mood]}</b> · 渴求<b>${c.crave}/5</b></span><span class="hint">连续打卡 ${streak()} 天</span></div>`;
     return;
   }
-  $('#checkinHint').textContent='花 10 秒记录今天的状态';
-  $('#checkinBody').innerHTML=`
-    <div class="hint" style="margin:0 0 6px">心情</div>
-    <div class="seg" id="ciMood">${['😣','😕','😐','🙂','😄'].map((m,i)=>`<button data-v="${i}" ${i===2?'class="on"':''}>${m}</button>`).join('')}</div>
-    <div class="hint" style="margin:12px 0 6px">渴求强度</div>
-    <div class="seg" id="ciCrave">${[1,2,3,4,5].map(i=>`<button data-v="${i}" ${i===3?'class="on"':''}>${i}</button>`).join('')}</div>
-    <button class="btn primary" style="margin-top:14px" id="ciSave">完成打卡</button>`;
-  segBind($('#ciMood'));segBind($('#ciCrave'));
-  $('#ciSave').onclick=()=>{
-    S.checkins[k]={mood:+$('#ciMood .on').dataset.v,crave:+$('#ciCrave .on').dataset.v};save();
+  const step2=ciMood!==null;
+  $('#checkinBody').innerHTML=`<h3>${step2?'现在有多想抽？':'今天感觉怎么样？'}</h3>
+    <p class="hint">${step2?'1 是几乎不想，5 是非常想':'每天十秒，助手会参考它'}</p>
+    <div class="ci-opts">${step2?[1,2,3,4,5].map(i=>`<button data-v="${i}">${i}</button>`).join(''):MOODS.map((m,i)=>`<button data-v="${i}">${m}</button>`).join('')}</div>`;
+  $('#checkinBody .ci-opts').onclick=e=>{
+    const b=e.target.closest('button'); if(!b) return; buzz();
+    if(!step2){ciMood=+b.dataset.v;renderCheckin();return}
+    S.checkins[k]={mood:ciMood,crave:+b.dataset.v};ciMood=null;save();
     toast(`打卡成功 · 连续 ${streak()} 天`);renderToday();
-    if(S.checkins[k].crave>=4) agentSay('看到你今天渴求比较强。把「想抽了」当成急救键，我会陪你撑过那几分钟。');
+    if(S.checkins[k].crave>=4) agentSay('看到你今天渴求比较强。想抽的时候直接跟我说，或者点「想抽了」，我会陪你撑过那几分钟。');
   };
 }
+const MOODS=['很差','较差','一般','不错','很好'];
 function streak(){let n=0,t=Date.now();while(S.checkins[dayKey(t)]){n++;t=dayStart(t,-1)+HOUR*12}return n}
 
 /* ---------- cigarette lab ---------- */
@@ -552,7 +579,7 @@ $('#putDown').onclick=e=>{
   (function rew(t){const k=Math.min(1,(t-t0)/1600);P=from*(1-k);drawLab();
     $$('#events li').forEach((li,i)=>{li.classList.add('on');li.textContent=STAGES[i].g||`寿命 +${LIFE_PER_CIG} 分钟，已计入你的成就`});
     $$('.organ').forEach(o=>o.classList.add('on'));
-    if(k<1)requestAnimationFrame(rew);else{$('#holdText').textContent='你放下了这一根 🌱';done=true}
+    if(k<1)requestAnimationFrame(rew);else{$('#holdText').textContent='你放下了这一根';done=true}
   })(t0);
   renderAll();undoable(ev,'已记为忍住 1 次');
 };
@@ -575,12 +602,12 @@ function renderHeal(){
   $('#healLead').textContent=`距离上一根烟 ${fmtLife(since/MIN).join(' ')}，已解锁 ${MILES.filter(m=>since>=m.t).length}/${MILES.length} 个恢复节点。`;
   $('#timeline').innerHTML=MILES.map(m=>{
     const pct=Math.min(100,since/m.t*100);
-    return `<div class="mile ${pct>=100?'done':''}"><div class="ic">${m.ic}</div><div style="flex:1"><div class="t">${m.label}${pct>=100?' · 已达成':''}</div><div class="d">${m.d}</div><div class="bar"><i style="width:${pct.toFixed(1)}%"></i></div></div></div>`;
+    return `<div class="mile ${pct>=100?'done':''}"><i class="dot"></i><div><div class="t">${m.label}${pct>=100?' · 已达成':''}</div><div class="d">${m.d}</div><div class="bar"><i style="width:${pct.toFixed(1)}%"></i></div></div></div>`;
   }).join('');
   const a=avoided(), r=resists().length;
   const B=[
-    ['🌅','无烟 24h',since>=DAY],['🔥','无烟 3 天',since>=3*DAY],['🏅','无烟 1 周',since>=7*DAY],['🏆','无烟 1 月',since>=30*DAY],
-    ['✋','忍住 1 次',r>=1],['🛡️','忍住 10 次',r>=10],['💰','省下 ¥100',a*perCig()>=100],['⏳','夺回 1 天',a*LIFE_PER_CIG>=1440]
+    ['24h','无烟 24 小时',since>=DAY],['3天','无烟 3 天',since>=3*DAY],['1周','无烟 1 周',since>=7*DAY],['1月','无烟 1 个月',since>=30*DAY],
+    ['1次','忍住 1 次',r>=1],['10次','忍住 10 次',r>=10],['¥100','省下 ¥100',a*perCig()>=100],['1天','夺回 1 天',a*LIFE_PER_CIG>=1440]
   ];
   $('#badges').innerHTML=B.map(([i,l,g])=>`<div class="badge ${g?'got':''}"><div class="b">${i}</div>${l}</div>`).join('');
 }
@@ -619,7 +646,13 @@ function openSOS(trig){
   segBind($('#sosLv'));
   sosStep('ask');show('#sos');
 }
-$('#sosBtn').onclick=()=>openSOS();
+$('#sosBtn').onclick=()=>{buzz();openSOS()};
+// 助手的急救卡片：跳过提问，直接用指定的方法开始
+function startSOS(trigger,intensity,method){
+  const rest=recommend(trigger,intensity).filter(r=>r.id!==method).slice(0,3);
+  sosCur={trigger,intensity,list:[recommend(trigger,intensity).find(r=>r.id===method),...rest],idx:0};
+  show('#sos');runMethod();sosStep('do');
+}
 $('#sosGo').onclick=()=>{
   const trigger=chipVal($('#sosTrig'))[0]||null, intensity=+$('#sosLv .on').dataset.v;
   sosCur={trigger,intensity,list:recommend(trigger,intensity).slice(0,4),idx:0};
@@ -659,7 +692,7 @@ function sosEnd(outcome){
   S.sos.push(rec);
   addEvent({type:outcome,t:rec.t,trigger:sosCur.trigger,intensity:sosCur.intensity,via:'sos',sosId:rec.id});
   sosCur.rec=rec;
-  $('#sosDoneTitle').textContent=outcome==='resist'?'你挺过去了 🎉':'没关系，这一根已经记下';
+  $('#sosDoneTitle').textContent=outcome==='resist'?'你挺过去了':'没关系，这一根已经记下';
   $('#sosDoneSub').textContent=outcome==='resist'
     ?`又一次证明这股冲动会过去。累计忍住 ${resists().length} 次。`
     :`一次复吸不会让你从零开始：累计少抽约 ${Math.floor(avoided())} 根、忍住 ${resists().length} 次，这些都还在。`;
@@ -668,7 +701,7 @@ function sosEnd(outcome){
   $('#sosNext').hidden=true;
   sosStep('done');renderAll();
 }
-$('#sosWin').onclick=()=>sosEnd('resist');
+$('#sosWin').onclick=()=>{buzz();sosEnd('resist')};
 $('#sosLose').onclick=()=>sosEnd('smoke');
 $('#sosRate').onclick=e=>{
   const b=e.target.closest('button'); if(!b||!sosCur||!sosCur.rec) return;
@@ -771,26 +804,41 @@ function renderTriggers(){
     : '<p class="hint">还没有足够的记录。记录时选上场景，我会帮你归纳。</p>';
 }
 
-/* ---------- 陪伴：本地规则对话 ---------- */
-const QUICK=['我现在很想抽','我压力好大','我又抽了','我的进度怎么样','戒烟后身体会怎样','能推荐戒烟药吗'];
+/* ---------- 助手：对话 ---------- */
+const QUICK=['我现在很想抽','我又抽了一根','帮我看看规律','这周怎么安排','压力好大','能推荐戒烟药吗'];
 $('#quick').innerHTML=QUICK.map(q=>`<button>${q}</button>`).join('');
 $('#quick').onclick=e=>{if(e.target.tagName==='BUTTON')userSay(e.target.textContent)};
 $('#composer').onsubmit=e=>{e.preventDefault();const v=$('#chatInput').value.trim();if(!v)return;$('#chatInput').value='';userSay(v)};
+const SUGGEST=[['我现在很想抽','马上给我一个办法'],['我又抽了一根','帮我记下来，看看下次怎么办'],['帮我看看规律','我最容易在什么时候抽'],['这周怎么安排','定一个具体的小计划']];
 function renderChat(){
-  $('#chat').innerHTML=S.chat.map(m=>`<div class="msg ${m.r}${m.warn?' warn':''}${m.typing?' typing':''}">${esc(m.x)}${m.act?`<br><button class="act" data-act="${m.act}">${m.actLabel}</button>`:''}</div>`).join('');
-  $('#chat').scrollTop=1e6;
+  // 刚开始聊时，用几张建议卡代替空白输入框
+  const fresh=S.chat.filter(m=>m.r==='me').length===0;
+  $('#quick').hidden=fresh;
+  $('#chat').innerHTML=S.chat.map((m,i)=>`<div class="msg ${m.r}${m.warn?' warn':''}${m.typing?' typing':''}">`
+    +(m.steps&&m.steps.length?`<div class="steps">${m.steps.map(s=>`<span>${esc(s)}</span>`).join('')}</div>`:'')
+    +(m.typing?`<span class="dots"><i></i><i></i><i></i></span>`:`<span class="txt">${esc(m.x)}</span>`)
+    +(m.act?`<br><button class="act" data-act="${m.act}">${m.actLabel}</button>`:'')
+    +(m.cards&&m.cards.length?`<div class="acts">${m.cards.map((c,j)=>cardHtml(c,i,j)).join('')}</div>`:'')
+    +'</div>').join('')
+    +(fresh?`<div class="suggest">${SUGGEST.map(([q,d])=>`<button data-q="${q}"><b>${q}</b><small>${d}</small></button>`).join('')}</div>`:'');
+  if($('#tab-agent').classList.contains('active')) window.scrollTo({top:document.body.scrollHeight});
 }
-$('#chat').onclick=e=>{const a=e.target.dataset.act;if(a==='sos')openSOS();if(a==='log')openLog('smoke',false);if(a==='lab')goTab('cig');if(a==='heal')goTab('heal')};
+$('#chat').onclick=e=>{
+  const c=e.target.closest('[data-card]'); if(c){buzz();runCard(...c.dataset.card.split(':').map(Number));return}
+  const q=e.target.closest('[data-q]'); if(q){userSay(q.dataset.q);return}
+  const a=e.target.dataset.act;if(a==='sos')openSOS();if(a==='log')openLog('smoke',false);if(a==='lab')goTab('cig');if(a==='heal')goTab('progress');
+};
 function agentSay(x,opt={}){S.chat.push(Object.assign({r:'ai',x},opt));S.chat=S.chat.slice(-60);save();renderChat()}
 function userSay(x){
   const r=reply(x);
   const history=aiHistory();   // 发送给 AI 的上下文不含这条，下面单独追加
   S.chat.push({r:'me',x});renderChat();
-  if(r.warn||!aiActive()){setTimeout(()=>agentSay(r.x,r),400);return}
-  aiSay(r,[...history,{role:'user',content:x}]);
+  // 危机、急症、用药：始终用固定的安全回复，不交给 AI，也不调用工具
+  if(r.warn){setTimeout(()=>agentSay(r.x,r),300);return}
+  agentTurn(x,history);
 }
 function welcomeMsg(){
-  return `你好${S.name?'，'+S.name:''}！我是你的戒烟伙伴。\n你的目标是「${S.mode==='quit'?'彻底戒烟':'逐步减量'}」，基线每天 ${S.base} 根。\n想抽的时候点右下角「想抽了」；抽了也没关系，记下来，我们一起找规律。`;
+  return `你好${S.name?'，'+S.name:''}，我是你的戒烟助手。\n你的目标是「${S.mode==='quit'?'彻底戒烟':'逐步减量'}」，基线每天 ${S.base} 根。\n想抽、抽了、或者想看看自己的规律，都可以直接跟我说。我会查看你的记录，替你准备好下一步。`;
 }
 function reply(x){
   const has=re=>re.test(x);
@@ -816,8 +864,207 @@ function reply(x){
   return {x:`我在听。能说说此刻是什么场景吗？比如${TRIGGERS.slice(0,4).join('、')}……知道场景后我能给你更具体的办法。`};
 }
 
+/* ---------- 助手：工具 ----------
+ * 工具在浏览器里执行，记录不离开这台设备；发给 AI 的只有工具算出来的统计结果。
+ * offer_* 只生成卡片，用户点了才真正执行（开始急救、加入计划、设提醒、记一笔）。 */
+const TOOL_LABEL={get_progress:'看了你的进度',find_patterns:'分析了最近的记录',recommend_methods:'挑了几个办法',
+  offer_sos:'准备了急救',offer_plan:'拟了一个计划',offer_reminder:'准备了提醒',offer_log:'准备记下这一根'};
+const pickTrigger = t => TRIGGERS.includes(t) ? t : null;
+const clampLv = v => Math.min(5,Math.max(1,Math.round(+v)||3));
+function riskyHours(days){
+  const c={}; smokes().filter(e=>e.t>=Date.now()-days*DAY).forEach(e=>{const h=new Date(e.t).getHours();c[h]=(c[h]||0)+1});
+  return Object.entries(c).map(([h,n])=>({h:+h,n})).sort((a,b)=>b.n-a.n);
+}
+const TOOLS={
+  get_progress(){
+    const t0=dayStart(Date.now()), sc=smokes().filter(e=>e.t>=t0).length, a=avoided();
+    return {goal:S.mode==='quit'?'彻底戒烟':'逐步减量',day:dayNo(),baseline_per_day:S.base,smoked_today:sc,target_today:targetFor(Date.now()),
+      resisted_today:resists().filter(e=>e.t>=t0).length,hours_since_last_cigarette:+((Date.now()-lastSmoke())/HOUR).toFixed(1),
+      avoided_total:Math.floor(a),money_saved:Math.round(a*perCig()),resisted_total:resists().length,checkin_streak:streak()};
+  },
+  find_patterns({days=14}={}){
+    days=Math.min(30,Math.max(3,Math.round(+days)||14));
+    if(!S.consent) return {note:'用户关闭了个性化分析，只能提供进度数据'};
+    const since=Date.now()-days*DAY, by=type=>{const c={};S.events.forEach(e=>{if(e.type===type&&e.trigger&&e.t>=since)c[e.trigger]=(c[e.trigger]||0)+1});return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,4)};
+    const sos=S.sos.filter(s=>s.t>=since&&s.outcome), days_=weekDays().filter(d=>d.active);
+    const methods=Object.keys(METHODS).map(id=>{const xs=S.sos.filter(s=>s.method===id&&s.rating);return {name:METHODS[id].name,rated:xs.length,helpful:xs.filter(s=>s.rating==='good').length}}).filter(m=>m.rated).sort((a,b)=>b.helpful-a.helpful).slice(0,4);
+    return {days,smoked_by_trigger:by('smoke'),resisted_by_trigger:by('resist'),risky_hours:riskyHours(days).slice(0,3).map(r=>({hour:r.h,cigarettes:r.n})),
+      sos_attempts:sos.length,sos_resisted:sos.filter(s=>s.outcome==='resist').length,methods_rated:methods,
+      avg_per_day_last_7:days_.length?+(days_.reduce((a,d)=>a+d.smoke,0)/days_.length).toFixed(1):null,
+      current_plan:S.plan?{trigger:S.plan.trigger,method:METHODS[S.plan.method].name}:null,total_records:S.events.length};
+  },
+  recommend_methods({trigger,intensity}={}){
+    const t=pickTrigger(trigger), lv=clampLv(intensity);
+    return {trigger:t,intensity:lv,methods:recommend(t,lv).slice(0,3).map(r=>({method:r.id,name:METHODS[r.id].name,reason:r.reason,minutes:Math.ceil(METHODS[r.id].sec/60)}))};
+  },
+  offer_sos({trigger,intensity,method}={},cards){
+    if(!METHODS[method]) return {error:'未知的方法 id，请先调用 recommend_methods'};
+    cards.push({type:'sos',trigger:pickTrigger(trigger),intensity:clampLv(intensity),method}); return {shown:true,note:'卡片已显示，等用户点开始'};
+  },
+  offer_plan({trigger,method}={},cards){
+    if(!METHODS[method]||!pickTrigger(trigger)) return {error:'需要有效的场景和方法 id'};
+    cards.push({type:'plan',trigger,method}); return {shown:true,note:'等用户确认后才会替换当前计划'};
+  },
+  offer_reminder({minutes,note}={},cards){
+    const m=Math.min(720,Math.max(5,Math.round(+minutes)||30)), n=String(note||'').trim().slice(0,30);
+    if(!n) return {error:'需要提醒内容'};
+    cards.push({type:'reminder',minutes:m,note:n}); return {shown:true,note:'等用户确认；只在页面开着时提醒'};
+  },
+  offer_log({trigger}={},cards){
+    cards.push({type:'log',trigger:pickTrigger(trigger)}); return {shown:true,note:'等用户确认后记录'};
+  }
+};
+function runTool(name,args,cards){
+  if(!TOOLS[name]) return {error:'没有这个工具'};
+  try{return TOOLS[name](args||{},cards)}catch(e){return {error:'执行失败'}}
+}
 
-/* ---------- AI 陪伴 ----------
+/* ---------- 助手：卡片 ---------- */
+const fmtIn = m => m<60?`${m} 分钟后`:`${+(m/60).toFixed(1)} 小时后`;
+function cardHtml(c,i,j){
+  const m=METHODS[c.method], btn=(label,doneLabel)=>`<button data-card="${i}:${j}">${c.done?doneLabel:label}</button>`;
+  const body = c.type==='sos' ? [`急救 · ${m.name}`,`${c.trigger||'当下'} · 渴求 ${c.intensity}/5 · 约 ${Math.ceil(m.sec/60)} 分钟`,btn('开始','已开始')]
+    : c.type==='plan' ? [`下周计划 · ${m.name}`,`每次「${c.trigger}」想抽时先做`,btn('加入','已加入')]
+    : c.type==='reminder' ? [`提醒 · ${c.note}`,`${fmtIn(c.minutes)} · 页面开着时提醒`,btn('设定','已设定')]
+    : [`记下这一根`,`${c.trigger?`场景：${c.trigger} · `:''}不会清零你的累计进度`,btn('记下','已记下')];
+  return `<div class="act-card is-${c.type}${c.done?' done':''}"><div><b>${esc(body[0])}</b><small>${esc(body[1])}</small></div>${body[2]}</div>`;
+}
+function runCard(i,j){
+  const c=S.chat[i]&&S.chat[i].cards&&S.chat[i].cards[j]; if(!c||c.done) return;
+  if(c.type==='sos'){startSOS(c.trigger,c.intensity,c.method);c.done=true}
+  if(c.type==='plan'){S.plan={t:Date.now(),trigger:c.trigger,method:c.method};c.done=true;renderAll();toast('已加入计划，今天的预案也跟着更新')}
+  if(c.type==='reminder'){
+    S.reminders.push({id:uid(),at:Date.now()+c.minutes*MIN,note:c.note});c.done=true;
+    try{if(window.Notification&&Notification.permission==='default')Notification.requestPermission()}catch(e){}
+    toast(`好的，${fmtIn(c.minutes)}提醒你`);
+  }
+  if(c.type==='log'){const ev=addEvent({type:'smoke',t:Date.now(),trigger:c.trigger,via:'agent'});c.done=true;renderAll();undoable(ev,'已记下这一根，累计进度还在')}
+  save();renderChat();
+}
+function checkReminders(){
+  const due=S.reminders.filter(r=>r.at<=Date.now()); if(!due.length) return;
+  S.reminders=S.reminders.filter(r=>r.at>Date.now());
+  due.forEach(r=>{
+    agentSay(`提醒：${r.note}`);toast(`提醒：${r.note}`);
+    try{if(window.Notification&&Notification.permission==='granted')new Notification('每一根',{body:r.note})}catch(e){}
+  });
+}
+
+/* ---------- 助手：决策循环 ----------
+ * 有 AI 时由模型决定调哪些工具（最多 4 轮）；没有 AI 或连不上时，用同一套工具走本地规则。 */
+const AGENT_STEPS=4;
+const fnDef=(name,description,properties={},required=[])=>({type:'function',function:{name,description,parameters:{type:'object',properties,required}}});
+const T_TRIG={type:'string',enum:TRIGGERS}, T_LV={type:'integer',minimum:1,maximum:5}, T_METHOD={type:'string',enum:Object.keys(METHODS)};
+// 只在本机直连模式使用；线上转发时，工具清单和提示词由服务端（server/app.py）提供，两边保持一致
+const AGENT_TOOLS=[
+  fnDef('get_progress','查看用户的目标、今天抽了几根、今日目标、累计少抽、忍住次数和坚持天数。'),
+  fnDef('find_patterns','分析最近的记录：最容易抽烟的场景和时段、急救成功率、哪些办法对这个用户有效。',{days:{type:'integer',minimum:3,maximum:30}}),
+  fnDef('recommend_methods','按场景和渴求强度，从急救方法库挑出最适合这个用户的 3 个办法。',{trigger:T_TRIG,intensity:T_LV},['intensity']),
+  fnDef('offer_sos','给用户一张「开始急救」卡片，点了才开始。用户此刻想抽时使用。',{trigger:T_TRIG,intensity:T_LV,method:T_METHOD},['method']),
+  fnDef('offer_plan','建议把「某个场景下先做某个动作」加入下周计划，由用户确认。',{trigger:T_TRIG,method:T_METHOD},['trigger','method']),
+  fnDef('offer_reminder','建议若干分钟后提醒用户一件事，由用户确认。',{minutes:{type:'integer',minimum:5,maximum:720},note:{type:'string'}},['minutes','note']),
+  fnDef('offer_log','用户说刚抽了烟时，生成「记下这一根」卡片，由用户确认。',{trigger:T_TRIG})
+];
+const AGENT_RULES=`
+你现在是能调用工具的戒烟助手（Agent）。工作方式：
+- 先判断用户需要什么。需要了解情况时调用 get_progress、find_patterns，不要凭空猜数字。
+- 用户此刻想抽：先 recommend_methods，再用 offer_sos 给出排第一的办法。
+- 用户说抽了：不批评，用 offer_log 让他记下，再结合 find_patterns 说一句下次怎么提前准备。
+- 同一个场景反复失守时，可以用 offer_plan 建议固定应对；用户提到之后某个时间点时可以用 offer_reminder。
+- 工具结果是用户的真实记录，引用数字要准确；没有记录就如实说还没有数据。
+- 一次回复最多给 2 张卡片。最终回复 2–4 句，口语化，不要提工具名称和 id。
+- 闲聊或简单问题直接回答，不必调用工具。
+- 不要让用户自己去点「想抽了」或让他报数据：需要数据就调工具查，需要行动就直接给卡片。`;
+async function llmStep(messages){
+  const proxy=AI.mode==='proxy';
+  const headers={'content-type':'application/json'}; if(!proxy) headers.authorization='Bearer '+AI.key;
+  // 线上转发只发对话、工具结果和几项统计数字；系统提示词和工具清单由服务端拼
+  const body=proxy?{agent:true,messages,profile:aiProfile()}
+    :Object.assign({model:AI.model,max_tokens:800,messages:[{role:'system',content:aiSystemPrompt()+AGENT_RULES},...messages],tools:AGENT_TOOLS,tool_choice:'auto'},AI.extra||{});
+  let res;
+  try{res=await fetch(AI.url,{method:'POST',headers,body:JSON.stringify(body)})}
+  catch(e){throw new Error('连不上 AI 服务，请检查网络')}
+  const j=await res.json().catch(()=>({}));
+  if(!res.ok){const msg=j.error;throw new Error((typeof msg==='string'?msg:msg&&msg.message)||`HTTP ${res.status}`)}
+  const msg=proxy?j.message:j.choices&&j.choices[0]&&j.choices[0].message;
+  if(!msg) throw new Error('没有收到回复');
+  const calls=(msg.tool_calls||[]).map((c,i)=>({id:c.id||`call_${i}`,type:'function',function:{name:c.function.name,arguments:c.function.arguments||'{}'}}));
+  return calls.length?{role:'assistant',content:msg.content||'',tool_calls:calls}:{role:'assistant',content:msg.content||''};
+}
+let agentBusy=false, aiFailNoted=false;
+async function agentTurn(text,history){
+  if(agentBusy){setTimeout(()=>agentTurn(text,history),500);return}
+  agentBusy=true;
+  const m={r:'ai',x:'',typing:true,steps:[],cards:[]};
+  S.chat.push(m);renderChat();
+  const step=name=>{const l=TOOL_LABEL[name];if(l&&!m.steps.includes(l))m.steps.push(l);renderChat()};
+  try{
+    if(!aiActive()){await new Promise(r=>setTimeout(r,450));Object.assign(m,planLocal(text,step,m.cards));return}
+    const msgs=[...history.slice(-10),{role:'user',content:text}];
+    for(let i=0;i<=AGENT_STEPS;i++){
+      const out=await llmStep(msgs);
+      if(!out.tool_calls||i===AGENT_STEPS){
+        m.x=out.content.trim()||(m.cards.length?'我准备好了，点下面开始。':'我在。');
+        // 模型一个工具都没调、但用户明显需要行动（想抽、抽了、看规律、定计划）时，用本地工具补上真实数据和卡片
+        if(!m.steps.length){const local=planLocal(text,step,m.cards);if(m.steps.length)m.x=local.x}
+        break;
+      }
+      msgs.push(out);
+      for(const c of out.tool_calls){
+        let args={}; try{args=JSON.parse(c.function.arguments)}catch(e){}
+        const result=m.cards.length>=2&&c.function.name.startsWith('offer_')?{error:'这次已经给了 2 张卡片'}:runTool(c.function.name,args,m.cards);
+        step(c.function.name);
+        msgs.push({role:'tool',tool_call_id:c.id,content:JSON.stringify(result)});
+      }
+    }
+  }catch(e){
+    // AI 连不上时安静地换成本地规则；每次打开页面最多提示一次
+    console.warn('AI 助手失败：',e.message);
+    m.steps=[];m.cards.length=0;
+    const local=planLocal(text,step,m.cards);
+    Object.assign(m,local,{x:local.x+(aiFailNoted?'':'\n\n（AI 暂时连不上，先用本地规则）')});
+    aiFailNoted=true;
+  }finally{
+    delete m.typing; agentBusy=false; S.chat=S.chat.slice(-60); save(); renderChat();
+  }
+}
+// 本地规则版：按意图依次调用同一套工具，回复由模板生成
+function planLocal(text,step,cards){
+  const has=re=>re.test(text), call=(n,a)=>{step(n);return runTool(n,a,cards)};
+  const RE={'压力':/压力|加班|焦虑|开会|工作/,'饭后':/饭后|吃完|吃饭/,'咖啡/茶':/咖啡|喝茶/,'喝酒':/喝酒|酒局|喝了点/,'社交':/朋友|聚会|递烟|同事|应酬/,'无聊':/无聊|没事做/,'起床':/起床|醒来|早上/,'开车':/开车|堵车/};
+  const trig=Object.keys(RE).find(k=>RE[k].test(text))||null;
+  const lv=clampLv((text.match(/([1-5])\s*(分|级)?/)||[])[1]||(has(/特别|非常|受不了|忍不住/)?4:3));
+  if(has(/想抽|好想|忍不住|馋|受不了|压力|焦虑|烦/)){
+    const r=call('recommend_methods',{trigger:trig,intensity:lv}).methods[0];
+    call('offer_sos',{trigger:trig,intensity:lv,method:r.method});
+    return {x:`这股冲动通常几分钟内就会减弱。${trig?`「${trig}」的时候，`:''}先试试「${r.name}」，${r.reason}。准备好了就点开始，我陪你计时。`};
+  }
+  if(has(/又抽|抽了|复吸|没忍住/)){
+    call('offer_log',{trigger:trig});
+    const p=call('find_patterns',{days:14}), top=p.smoked_by_trigger&&p.smoked_by_trigger[0];
+    return {x:`没关系，一次不等于失败，累计进度不会清零。先把这一根记下来。${top?`\n最近两周你在「${top[0]}」时抽得最多（${top[1]} 次），下次这个场景前可以提前准备。`:''}`};
+  }
+  if(has(/规律|分析|进度|怎么样|复盘|总结|计划|安排|下周/)){
+    const g=call('get_progress'), p=call('find_patterns',{days:14});
+    const top=p.smoked_by_trigger&&p.smoked_by_trigger[0], hour=p.risky_hours&&p.risky_hours[0];
+    let x=`第 ${g.day} 天，今天抽了 ${g.smoked_today} 根（目标 ≤ ${g.target_today}），累计比基线少抽约 ${g.avoided_total} 根、忍住 ${g.resisted_total} 次。`;
+    if(top){
+      x+=`\n最近两周「${top[0]}」是你抽烟最多的场景（${top[1]} 次）${hour?`，${hour.hour} 点前后最容易失守`:''}。`;
+      const r=call('recommend_methods',{trigger:top[0],intensity:3}).methods[0];
+      if(!S.plan||S.plan.trigger!==top[0]){call('offer_plan',{trigger:top[0],method:r.method});x+=`下周每次${top[0]}想抽时，先做「${r.name}」怎么样？`}
+    }else x+=p.note?'\n个性化分析已关闭，可在设置中开启。':'\n记录时选上场景，我就能帮你找出规律。';
+    return {x};
+  }
+  if(has(/提醒/)){
+    const mins=(text.match(/(\d+)\s*分钟/)||[])[1], hrs=(text.match(/(\d+)\s*(个)?小时/)||[])[1];
+    call('offer_reminder',{minutes:mins?+mins:hrs?hrs*60:30,note:trig?`${trig}前先做一次急救动作`:'看看现在的状态，想抽就点急救'});
+    return {x:'好的，我帮你准备了一个提醒，确认后生效。'};
+  }
+  return reply(text);
+}
+
+
+/* ---------- AI 来源 ----------
  * 两种来源：本机直连（js/config.local.js 里的 Key，已被 .gitignore 忽略）优先；
  * 否则走线上转发服务（js/ai-config.js 里的地址，Key 只存在云函数里）。 */
 const AI = (()=>{
@@ -836,7 +1083,7 @@ const aiActive = () => !!(AI&&(S.aiAsked?S.aiOn:true));
 function aiSystemPrompt(){
   const trig=personalTrigger(), best=Object.keys(METHODS).map(id=>({id,...methodStats(id,null)})).filter(m=>m.good).sort((a,b)=>b.good-a.good)[0];
   const ck=S.checkins[dayKey(Date.now())];
-  return `你是「每一根」戒烟 App 里的陪伴伙伴，用简体中文聊天。
+  return `你是「每一根」戒烟 App 里的助手，用简体中文聊天。
 风格：温暖、具体、不说教，像懂行的朋友。每次 2–4 句，口语化，不用 Markdown 标题和列表符号。
 原则：
 - 用户想抽时，先接住情绪，再给一个马上能做的小动作；可以提醒他点右下角「想抽了」做急救。
@@ -859,60 +1106,11 @@ function aiHistory(){
   }
   return msgs;
 }
-let aiBusy=false, aiFailNoted=false;
-async function aiSay(local,messages){
-  if(aiBusy){setTimeout(()=>agentSay(local.x,local),400);return}
-  aiBusy=true;
-  const m={r:'ai',x:'正在输入…',typing:true};
-  S.chat.push(m);renderChat();
-  try{
-    // 线上转发只发聊天内容和几项统计数字，系统提示词由服务端拼
-    const req=AI.mode==='proxy'
-      ? {headers:{'content-type':'application/json'},body:{messages:messages.slice(-10),profile:aiProfile()}}
-      : {headers:{'content-type':'application/json','authorization':'Bearer '+AI.key},
-         body:Object.assign({model:AI.model,stream:true,max_tokens:800,messages:[{role:'system',content:aiSystemPrompt()},...messages]},AI.extra||{})};
-    let res;
-    try{res=await fetch(AI.url,{method:'POST',headers:req.headers,body:JSON.stringify(req.body)})}
-    catch(e){throw new Error('连不上 AI 服务，请检查网络')}
-    if(!res.ok){
-      const t=await res.text().catch(()=>''); let msg='';
-      try{const j=JSON.parse(t);msg=j.error||j.Message}catch(e){}
-      if(typeof msg!=='string') msg=msg&&msg.message||'';
-      throw new Error(msg||`HTTP ${res.status}`+(/api.?key|invalid|unauth/i.test(t)?'，Key 无效或已撤销':''));
-    }
-    const reader=res.body.getReader(), dec=new TextDecoder();
-    let buf='', text='';
-    for(;;){
-      const {done,value}=await reader.read(); if(done) break;
-      buf+=dec.decode(value,{stream:true});
-      const lines=buf.split('\n'); buf=lines.pop();
-      for(const line of lines){
-        if(!line.startsWith('data:')) continue;
-        const data=line.slice(5).trim(); if(data==='[DONE]') continue;
-        let ev; try{ev=JSON.parse(data)}catch(e){continue}
-        const d=ev.choices&&ev.choices[0]&&ev.choices[0].delta&&ev.choices[0].delta.content;
-        if(d){text+=d;m.x=text.replace(/^\s+/,'');m.typing=false;renderChat()}
-      }
-    }
-    if(!text.trim()) throw new Error('没有收到回复');
-    m.x=text.trim();
-    // 本地意图识别出的快捷按钮（呼吸练习、记录这一根等）继续挂在 AI 回复后面
-    if(local.act){m.act=local.act;m.actLabel=local.actLabel}
-  }catch(e){
-    // AI 连不上时安静地用本地回复；每次打开页面最多提示一次
-    Object.assign(m,{x:local.x+(aiFailNoted?'':'\n\n（AI 暂时连不上，先用本地回复）'),act:local.act,actLabel:local.actLabel});
-    aiFailNoted=true;
-    console.warn('AI 回复失败：',e.message);
-  }finally{
-    delete m.typing; aiBusy=false; S.chat=S.chat.slice(-60); save(); renderChat();
-  }
-}
-
 /* ---------- 设置与隐私 ---------- */
 function renderSettings(){
   $('#sConsent').checked=S.consent;
   $('#sAiRow').hidden=!AI;
-  if(AI){$('#sAi').checked=aiActive();$('#sAiTag').textContent=AI.mode==='local'?'仅本机':'Beta';$('#sAiSub').textContent=`使用 ${AI.name} 生成聊天回复。开启后，聊天内容和你的统计摘要会${AI.mode==='proxy'?'经本项目的服务器转发':'发送'}给 ${AI.name}`}
+  if(AI){$('#sAi').checked=aiActive();$('#sAiTag').textContent=AI.mode==='local'?'仅本机':'Beta';$('#sAiSub').textContent=`由 ${AI.name} 理解你的话、决定查看哪些记录和准备什么。记录在本机计算，只有对话和统计结果会${AI.mode==='proxy'?'经本项目的服务器转发':'发送'}给 ${AI.name}`}
   $('#demoTitle').textContent=S.demo?'重置演示数据':'载入演示数据';
   $('#demoSub').textContent=S.demo?'恢复到初始的模拟数据':'用模拟数据替换当前记录';
   renderPrivacy(); armReset(false); applyTheme();
@@ -920,18 +1118,18 @@ function renderSettings(){
 function renderPrivacy(){
   const ai=aiActive();
   $('#pIcon').classList.toggle('ai',ai);
-  $('#pTitle').textContent=ai?'记录在本机，聊天会发送给 AI':'数据只保存在这台设备上';
-  $('#pSub').textContent=ai?`已开启 AI 陪伴，聊天内容会发送给 ${AI.name}`:'不注册、不上传，应用不会把记录发送出去';
+  $('#pTitle').textContent=ai?'记录在本机，对话会发送给 AI':'数据只保存在这台设备上';
+  $('#pSub').textContent=ai?`已开启 AI 助手，对话和统计结果会发送给 ${AI.name}`:'不注册、不上传，应用不会把记录发送出去';
   $('#pAiLine').textContent=ai
-    ?`AI 陪伴已开启：你在「陪伴」里发的消息，以及统计摘要（坚持天数、少抽支数、常见诱因），会${AI.mode==='proxy'?'经本项目的服务器（不记录聊天内容）转发':'发送'}给 ${AI.name} 生成回复。其他记录不会发送。关闭后立即停止。`
-    :'陪伴对话由本地规则生成，不经过任何服务器。';
-  $('#chatHint').textContent=ai?`AI 回复（${AI.name}）· 消息会${AI.mode==='proxy'?'经本项目服务器转发':'发送'}给 ${AI.name} · 可在设置中关闭 · 不做诊断`:'本地规则回复 · 对话不会发送到任何服务器 · 不做诊断';
+    ?`AI 助手已开启：你在「助手」里发的消息，以及助手查看记录后算出的统计结果（坚持天数、各场景次数、常用办法的评价），会${AI.mode==='proxy'?'经本项目的服务器（不保存任何内容）转发':'发送'}给 ${AI.name}。原始记录不会发送。关闭后立即停止。`
+    :'助手由本地规则驱动，不经过任何服务器。';
+  $('#chatHint').textContent=ai?`由 ${AI.name} 驱动 · 记录在本机计算 · 不做诊断`:'本地规则 · 对话不会离开这台设备 · 不做诊断';
 }
 $('#openSettings').onclick=()=>{renderSettings();show('#settings')};
 $('#sClose').onclick=hide;
 segBind($('#themeSeg'),v=>{S.theme=v;save();applyTheme()});
 $('#sConsent').onchange=e=>{S.consent=e.target.checked;save();renderAll()};
-$('#sAi').onchange=e=>{S.aiOn=e.target.checked;S.aiAsked=true;save();renderPrivacy();toast(S.aiOn?`已开启 AI 陪伴（${AI.name}）`:'已关闭 AI 陪伴，改用本地回复')};
+$('#sAi').onchange=e=>{S.aiOn=e.target.checked;S.aiAsked=true;save();renderPrivacy();toast(S.aiOn?`已开启 AI 助手（${AI.name}）`:'已关闭 AI 助手，改用本地规则')};
 $('#sAbout').onclick=hide;
 // 页面里不能用 confirm()，危险操作改为"再点一次确认"
 let resetArmed=0;
@@ -998,7 +1196,8 @@ function loadDemo(){
   S.chat=[
     {r:'ai',x:welcomeMsg()},
     {r:'me',x:'昨天加班又抽多了'},
-    {r:'ai',x:'压力大时想抽烟很正常。昨天超了也没关系，你这周累计还是比基线少了不少。\n这周你在「压力」时用「慢呼吸」挺过去的次数最多，下次加班前可以先做一轮。',act:'sos',actLabel:'开始 1 分钟呼吸'}
+    {r:'ai',x:'压力大时想抽烟很正常。昨天超了也没关系，你这周累计还是比基线少了不少。\n这周你在「压力」时用「慢呼吸」挺过去的次数最多，今晚加班前先做一轮？',
+      steps:['看了你的进度','分析了最近的记录','挑了几个办法'],cards:[{type:'sos',trigger:'压力',intensity:3,method:'breath'},{type:'reminder',minutes:120,note:'加班前做一轮慢呼吸'}]}
   ];
   save(); setBrand(S.brand); renderAll(); renderChat(); goTab('today');
 }
@@ -1023,6 +1222,7 @@ applyTheme();
 const firstVisit=!S.setup;
 setBrand(S.brand); renderAll(); renderChat();
 setInterval(tick,1000);
+setInterval(checkReminders,30e3); checkReminders();
 renderPrivacy();
 route();
 if(firstVisit && location.hash!=='#about') setTimeout(()=>openWelcome(false),350);
